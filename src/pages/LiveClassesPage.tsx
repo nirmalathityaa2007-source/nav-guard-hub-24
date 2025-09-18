@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,11 @@ import { useAuth } from '@/contexts/AuthContext';
 const LiveClassesPage = () => {
   const [activeTab, setActiveTab] = useState('live');
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleJoinClass = () => {
+    navigate('/attendance-tracking');
+  };
 
   const liveClasses = [
     {
@@ -205,7 +211,7 @@ const LiveClassesPage = () => {
                   )}
 
                   <div className="flex gap-2">
-                    <Button className="flex-1">
+                    <Button className="flex-1" onClick={handleJoinClass}>
                       <Video className="h-4 w-4 mr-2" />
                       {user?.role === 'faculty' ? 'Start Class' : 'Join Class'}
                     </Button>

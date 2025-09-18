@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +21,14 @@ import {
 const MyClassesPage = () => {
   const [activeTab, setActiveTab] = useState('all');
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleClassAction = (course: any) => {
+    if (user?.role === 'faculty' && course.showStartClass) {
+      navigate('/attendance-tracking');
+    }
+    // For students or non-start class courses, keep existing behavior
+  };
 
   const courses = [
     {
@@ -235,7 +244,7 @@ const MyClassesPage = () => {
                   <div className="flex gap-2 pt-2">
                     {course.status === 'active' ? (
                       <>
-                        <Button className="flex-1">
+                        <Button className="flex-1" onClick={() => handleClassAction(course)}>
                           <Play className="h-4 w-4 mr-2" />
                           {user?.role === 'faculty' && course.showStartClass ? 'Start Class' : 'Continue Learning'}
                         </Button>
