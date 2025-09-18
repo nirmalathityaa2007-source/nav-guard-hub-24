@@ -1,0 +1,171 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Educational Platform Design System - Professional, Clean, Role-Based */
+
+@layer base {
+  :root {
+    /* Base colors - Professional education theme */
+    --background: 0 0% 100%;
+    --foreground: 215 25% 27%;
+
+    /* Card and surface colors */
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 27%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 27%;
+
+    /* Primary - Professional blue for main actions */
+    --primary: 214 84% 56%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 214 84% 46%;
+
+    /* Secondary - Light gray for subtle actions */
+    --secondary: 220 13% 95%;
+    --secondary-foreground: 215 25% 27%;
+
+    /* Muted colors for backgrounds */
+    --muted: 220 13% 95%;
+    --muted-foreground: 215 16% 47%;
+
+    /* Accent - Bright blue for highlights */
+    --accent: 214 95% 93%;
+    --accent-foreground: 214 84% 56%;
+
+    /* Role-specific colors for educational platform */
+    --student: 214 84% 56%;        /* Professional blue */
+    --student-foreground: 0 0% 100%;
+    --student-light: 214 95% 93%;
+
+    --faculty: 142 71% 45%;        /* Professional green */
+    --faculty-foreground: 0 0% 100%;
+    --faculty-light: 142 76% 73%;
+
+    --admin: 262 83% 58%;          /* Professional purple */
+    --admin-foreground: 0 0% 100%;
+    --admin-light: 262 100% 97%;
+
+    /* Status colors */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 93% 58%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Borders and inputs */
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 214 84% 56%;
+
+    /* Layout spacing */
+    --radius: 0.5rem;
+
+    /* Sidebar colors */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 215 25% 27%;
+    --sidebar-primary: 214 84% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 13% 95%;
+    --sidebar-accent-foreground: 215 25% 27%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 214 84% 56%;
+
+    /* Gradients for modern look */
+    --gradient-primary: linear-gradient(135deg, hsl(214, 84%, 56%), hsl(214, 84%, 46%));
+    --gradient-student: linear-gradient(135deg, hsl(214, 84%, 56%), hsl(214, 95%, 93%));
+    --gradient-faculty: linear-gradient(135deg, hsl(142, 71%, 45%), hsl(142, 76%, 73%));
+    --gradient-admin: linear-gradient(135deg, hsl(262, 83%, 58%), hsl(262, 100%, 97%));
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  }
+
+  .dark {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 214 84% 56%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 214 84% 66%;
+
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 217 33% 17%;
+    --accent-foreground: 214 84% 56%;
+
+    /* Role colors for dark mode */
+    --student: 214 84% 56%;
+    --student-foreground: 0 0% 100%;
+    --student-light: 214 95% 23%;
+
+    --faculty: 142 71% 45%;
+    --faculty-foreground: 0 0% 100%;
+    --faculty-light: 142 76% 23%;
+
+    --admin: 262 83% 58%;
+    --admin-foreground: 0 0% 100%;
+    --admin-light: 262 100% 27%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 214 84% 56%;
+
+    --sidebar-background: 222 47% 8%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 214 84% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 214 84% 56%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+
+  /* Custom utility classes for the education platform */
+  .role-student {
+    @apply text-student bg-student-light border-student;
+  }
+
+  .role-faculty {
+    @apply text-faculty bg-faculty-light border-faculty;
+  }
+
+  .role-admin {
+    @apply text-admin bg-admin-light border-admin;
+  }
+
+  .dashboard-card {
+    @apply bg-card border border-border rounded-lg shadow-sm p-6;
+  }
+
+  .stat-card {
+    @apply bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-lg p-4;
+  }
+}
