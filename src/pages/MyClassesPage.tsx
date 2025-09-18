@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   BookOpen, 
   Play, 
@@ -18,6 +19,7 @@ import {
 
 const MyClassesPage = () => {
   const [activeTab, setActiveTab] = useState('all');
+  const { user } = useAuth();
 
   const courses = [
     {
@@ -32,7 +34,8 @@ const MyClassesPage = () => {
       enrolled: 45,
       rating: 4.8,
       status: 'active',
-      category: 'mathematics'
+      category: 'mathematics',
+      showStartClass: true
     },
     {
       id: 2,
@@ -46,7 +49,8 @@ const MyClassesPage = () => {
       enrolled: 38,
       rating: 4.6,
       status: 'active',
-      category: 'science'
+      category: 'science',
+      showStartClass: false
     },
     {
       id: 3,
@@ -60,7 +64,8 @@ const MyClassesPage = () => {
       enrolled: 52,
       rating: 4.9,
       status: 'active',
-      category: 'technology'
+      category: 'technology',
+      showStartClass: true
     },
     {
       id: 4,
@@ -74,7 +79,38 @@ const MyClassesPage = () => {
       enrolled: 42,
       rating: 4.7,
       status: 'completed',
-      category: 'mathematics'
+      category: 'mathematics',
+      showStartClass: false
+    },
+    {
+      id: 5,
+      title: 'CSBS B.Tech',
+      instructor: 'Dr. Kumar',
+      progress: 65,
+      totalLessons: 28,
+      completedLessons: 18,
+      nextLesson: 'Software Engineering',
+      nextLessonTime: 'Friday, 11:00 AM',
+      enrolled: 35,
+      rating: 4.6,
+      status: 'active',
+      category: 'technology',
+      showStartClass: true
+    },
+    {
+      id: 6,
+      title: 'AIDS B.Tech',
+      instructor: 'Prof. Sharma',
+      progress: 70,
+      totalLessons: 32,
+      completedLessons: 22,
+      nextLesson: 'Machine Learning Basics',
+      nextLessonTime: 'Monday, 9:00 AM',
+      enrolled: 40,
+      rating: 4.8,
+      status: 'active',
+      category: 'technology',
+      showStartClass: true
     }
   ];
 
@@ -201,7 +237,7 @@ const MyClassesPage = () => {
                       <>
                         <Button className="flex-1">
                           <Play className="h-4 w-4 mr-2" />
-                          Continue Learning
+                          {user?.role === 'faculty' && course.showStartClass ? 'Start Class' : 'Continue Learning'}
                         </Button>
                         <Button variant="outline" size="icon">
                           <Video className="h-4 w-4" />

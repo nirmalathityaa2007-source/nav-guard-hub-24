@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   FileText, 
   Folder, 
@@ -16,12 +17,15 @@ import {
   FileImage,
   ExternalLink,
   Star,
-  Eye
+  Eye,
+  Upload,
+  Plus
 } from 'lucide-react';
 
 const ResourcesPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
+  const { user } = useAuth();
 
   const resources = [
     {
@@ -145,9 +149,23 @@ const ResourcesPage = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Resources</h1>
-        <p className="text-muted-foreground">Access course materials, documents, and learning resources</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold">Resources</h1>
+          <p className="text-muted-foreground">Access course materials, documents, and learning resources</p>
+        </div>
+        {user?.role === 'faculty' && (
+          <div className="flex gap-2">
+            <Button>
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Resource
+            </Button>
+            <Button variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Link
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Resource Statistics */}
