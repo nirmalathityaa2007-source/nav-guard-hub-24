@@ -63,7 +63,7 @@ export const routes: RouteConfig[] = [
   {
     path: '/attendance-tracking',
     element: 'AttendanceTrackingPage',
-    rolesAllowed: ['faculty'],
+    rolesAllowed: ['student', 'faculty'],
     label: 'Live Tracking',
     icon: 'Camera'
   },

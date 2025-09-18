@@ -76,8 +76,10 @@ const App = () => (
                   <Route path="/progress" element={<ProgressPage />} />
                   <Route path="/my-classes" element={<MyClassesPage />} />
                 </Route>
-                <Route element={<RequireAuth allowedRoles={['faculty']} />}>
+                <Route element={<RequireAuth allowedRoles={['student', 'faculty']} />}>
                   <Route path="/attendance-tracking" element={<AttendanceTrackingPage />} />
+                </Route>
+                <Route element={<RequireAuth allowedRoles={['faculty']} />}>
                   <Route path="/analytics" element={<AnalyticsPage />} />
                   <Route path="/reports" element={<ReportsPage />} />
                 </Route>
