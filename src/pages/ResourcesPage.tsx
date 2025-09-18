@@ -315,8 +315,17 @@ const ResourcesPage = () => {
                         </Button>
                       ) : (
                         <Button className="flex-1">
-                          <Download className="h-4 w-4 mr-2" />
-                          Download
+                          {user?.role === 'faculty' ? (
+                            <>
+                              <Upload className="h-4 w-4 mr-2" />
+                              Upload
+                            </>
+                          ) : (
+                            <>
+                              <Download className="h-4 w-4 mr-2" />
+                              Download
+                            </>
+                          )}
                         </Button>
                       )}
                       <Button variant="outline" size="icon">
