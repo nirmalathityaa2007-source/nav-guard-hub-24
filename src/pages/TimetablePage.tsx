@@ -2,12 +2,15 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, MapPin, User, Video } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Video, UserX } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTimetable } from '@/contexts/TimetableContext';
+import SubstituteManager from '@/components/SubstituteManager';
 
 const TimetablePage = () => {
   const [selectedWeek, setSelectedWeek] = useState('current');
   const { user } = useAuth();
+  const { timetable, markUnavailable } = useTimetable();
 
   const timeSlots = [
     '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', 
@@ -16,30 +19,16 @@ const TimetablePage = () => {
 
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-  const classes = {
-    'Monday': {
-      '10:00 AM': { subject: 'Mathematics 101', instructor: 'Dr. Smith', room: 'Room 205', type: 'lecture' },
-      '2:00 PM': { subject: 'Physics Lab', instructor: 'Prof. Johnson', room: 'Lab 3', type: 'lab' }
-    },
-    'Tuesday': {
-      '9:00 AM': { subject: 'Computer Science', instructor: 'Dr. Wilson', room: 'Room 301', type: 'lecture' },
-      '3:00 PM': { subject: 'Statistics', instructor: 'Prof. Davis', room: 'Room 102', type: 'lecture' }
-    },
-    'Wednesday': {
-      '11:00 AM': { subject: 'Mathematics 101', instructor: 'Dr. Smith', room: 'Room 205', type: 'lecture' },
-      '1:00 PM': { subject: 'Physics Fundamentals', instructor: 'Prof. Johnson', room: 'Room 401', type: 'lecture' }
-    },
-    'Thursday': {
-      '10:00 AM': { subject: 'Computer Science', instructor: 'Dr. Wilson', room: 'Room 301', type: 'lecture' },
-      '4:00 PM': { subject: 'Study Group', instructor: 'Self-study', room: 'Library', type: 'study' }
-    },
-    'Friday': {
-      '9:00 AM': { subject: 'Statistics', instructor: 'Prof. Davis', room: 'Room 102', type: 'lecture' },
-      '2:00 PM': { subject: 'Project Work', instructor: 'Team collaboration', room: 'Room 501', type: 'project' }
+  const handleMarkUnavailable = (day: string, time: string) => {
+    if (user) {
+      markUnavailable(day, time, user.name || 'current-user');
     }
   };
 
-  const getClassTypeColor = (type: string) => {
+  const getClassTypeColor = (type: string, needsSubstitute?: boolean, isSubstitute?: boolean) => {
+    if (needsSubstitute) return 'bg-red-100 text-red-700 border-red-200';
+    if (isSubstitute) return 'bg-green-100 text-green-700 border-green-200';
+    
     switch (type) {
       case 'lecture': return 'bg-primary text-primary-foreground';
       case 'lab': return 'bg-faculty text-faculty-foreground';
@@ -78,6 +67,9 @@ const TimetablePage = () => {
         </div>
       </div>
 
+      {/* Substitute Manager - Only for Faculty */}
+      {user?.role === 'faculty' && <SubstituteManager />}
+
       {/* Today's Classes Quick View - Only for Students */}
       {user?.role === 'student' && (
         <Card>
@@ -90,7 +82,7 @@ const TimetablePage = () => {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
-              {Object.entries(classes['Monday'] || {}).map(([time, classInfo]) => (
+              {Object.entries(timetable['Monday'] || {}).map(([time, classInfo]) => (
                 <div key={time} className="flex items-center space-x-4 p-4 border rounded-lg">
                   <div className="flex-shrink-0">
                     <div className="p-2 bg-primary/10 rounded-full">
@@ -111,6 +103,7 @@ const TimetablePage = () => {
                       <span className="flex items-center gap-1">
                         <User className="h-3 w-3" />
                         {classInfo.instructor}
+                        {classInfo.isSubstitute && <Badge variant="secondary" className="ml-1 text-xs">Substitute</Badge>}
                       </span>
                     </div>
                   </div>
@@ -147,15 +140,37 @@ const TimetablePage = () => {
                     {time}
                   </div>
                   {weekDays.map(day => {
-                    const classInfo = classes[day as keyof typeof classes]?.[time];
+                    const classInfo = timetable[day as keyof typeof timetable]?.[time];
+                    const isUserClass = user?.role === 'faculty' && classInfo && (
+                      classInfo.instructor === user.name || 
+                      classInfo.originalInstructor === user.name
+                    );
+                    
                     return (
-                      <div key={`${day}-${time}`} className="p-2 border border-border/50 min-h-[80px]">
+                      <div key={`${day}-${time}`} className="p-2 border border-border/50 min-h-[80px] relative">
                         {classInfo && (
-                          <div className={`p-2 rounded text-xs ${getClassTypeColor(classInfo.type)} h-full`}>
-                            <div className="font-medium truncate">{classInfo.subject}</div>
-                            <div className="opacity-90 truncate">{classInfo.instructor}</div>
-                            <div className="opacity-75 truncate">{classInfo.room}</div>
-                          </div>
+                          <>
+                            <div className={`p-2 rounded text-xs ${getClassTypeColor(classInfo.type, classInfo.needsSubstitute, classInfo.isSubstitute)} h-full border`}>
+                              <div className="font-medium truncate">{classInfo.subject}</div>
+                              <div className="opacity-90 truncate flex items-center gap-1">
+                                {classInfo.instructor}
+                                {classInfo.isSubstitute && <Badge variant="outline" className="text-xs px-1 py-0">Sub</Badge>}
+                                {classInfo.needsSubstitute && <Badge variant="destructive" className="text-xs px-1 py-0">Need Sub</Badge>}
+                              </div>
+                              <div className="opacity-75 truncate">{classInfo.room}</div>
+                            </div>
+                            {user?.role === 'faculty' && isUserClass && !classInfo.needsSubstitute && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="absolute top-1 right-1 h-6 w-6 p-0 hover:bg-red-100"
+                                onClick={() => handleMarkUnavailable(day, time)}
+                                title="Mark as unavailable"
+                              >
+                                <UserX className="h-3 w-3 text-red-600" />
+                              </Button>
+                            )}
+                          </>
                         )}
                       </div>
                     );
@@ -189,6 +204,14 @@ const TimetablePage = () => {
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-muted rounded"></div>
               <span className="text-sm">Study Group</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-red-100 border border-red-200 rounded"></div>
+              <span className="text-sm">Needs Substitute</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-green-100 border border-green-200 rounded"></div>
+              <span className="text-sm">Substitute Teacher</span>
             </div>
           </div>
         </CardContent>

@@ -7,6 +7,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import RequireAuth from "@/components/RequireAuth";
 import Layout from "@/components/Layout";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { TimetableProvider } from "@/contexts/TimetableContext";
 
 // Page imports
 import LoginSelector from "@/pages/LoginSelector";
@@ -42,7 +43,8 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <Routes>
+            <TimetableProvider>
+              <Routes>
               {/* Public routes - Role-specific login pages */}
               <Route path="/" element={<LoginSelector />} />
               <Route path="/student-login" element={<StudentLogin />} />
@@ -94,7 +96,8 @@ const App = () => (
 
               {/* 404 catch-all */}
               <Route path="*" element={<NotFoundPage />} />
-            </Routes>
+              </Routes>
+            </TimetableProvider>
           </AuthProvider>
         </BrowserRouter>
       </ErrorBoundary>
