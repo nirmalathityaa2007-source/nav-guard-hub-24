@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import AttendanceWidget from '@/components/AttendanceWidget';
+import SubstituteManager from '@/components/SubstituteManager';
 import {
   Users,
   BookOpen,
@@ -13,16 +14,24 @@ import {
   FileText,
   Video,
   BarChart3,
-  UserCheck
+  UserCheck,
+  UserX
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTimetable } from '@/contexts/TimetableContext';
 
 const FacultyDashboard = () => {
+  const { user } = useAuth();
+
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Faculty Dashboard</h1>
         <p className="text-muted-foreground">Manage your courses and track student progress.</p>
       </div>
+
+      {/* Substitute Manager */}
+      <SubstituteManager />
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

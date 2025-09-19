@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTimetable } from '@/contexts/TimetableContext';
+import SubstituteManager from '@/components/SubstituteManager';
 import { 
   BookOpen, 
   Play, 
@@ -15,19 +17,27 @@ import {
   Video,
   Clock,
   CheckCircle,
-  Star
+  Star,
+  UserX
 } from 'lucide-react';
 
 const MyClassesPage = () => {
   const [activeTab, setActiveTab] = useState('all');
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { markUnavailable } = useTimetable();
 
   const handleClassAction = (course: any) => {
     if (user?.role === 'faculty' && course.showStartClass) {
       navigate('/attendance-tracking');
     }
     // For students or non-start class courses, keep existing behavior
+  };
+
+  const handleMarkUnavailable = (course: any) => {
+    if (user && course.schedule) {
+      markUnavailable(course.schedule.day, course.schedule.time, user.name || 'current-user');
+    }
   };
 
   const courses = [
@@ -44,7 +54,8 @@ const MyClassesPage = () => {
       rating: 4.8,
       status: 'active',
       category: 'mathematics',
-      showStartClass: true
+      showStartClass: true,
+      schedule: { day: 'Monday', time: '10:00 AM' }
     },
     {
       id: 2,
@@ -59,7 +70,8 @@ const MyClassesPage = () => {
       rating: 4.6,
       status: 'active',
       category: 'science',
-      showStartClass: false
+      showStartClass: false,
+      schedule: { day: 'Tuesday', time: '9:00 AM' }
     },
     {
       id: 3,
@@ -74,7 +86,8 @@ const MyClassesPage = () => {
       rating: 4.9,
       status: 'active',
       category: 'technology',
-      showStartClass: true
+      showStartClass: true,
+      schedule: { day: 'Wednesday', time: '11:00 AM' }
     },
     {
       id: 4,
@@ -89,7 +102,8 @@ const MyClassesPage = () => {
       rating: 4.7,
       status: 'completed',
       category: 'mathematics',
-      showStartClass: false
+      showStartClass: false,
+      schedule: { day: 'Friday', time: '9:00 AM' }
     },
     {
       id: 5,
@@ -104,7 +118,8 @@ const MyClassesPage = () => {
       rating: 4.6,
       status: 'active',
       category: 'technology',
-      showStartClass: true
+      showStartClass: true,
+      schedule: { day: 'Thursday', time: '10:00 AM' }
     },
     {
       id: 6,
@@ -119,7 +134,8 @@ const MyClassesPage = () => {
       rating: 4.8,
       status: 'active',
       category: 'technology',
-      showStartClass: true
+      showStartClass: true,
+      schedule: { day: 'Monday', time: '2:00 PM' }
     }
   ];
 
@@ -135,6 +151,9 @@ const MyClassesPage = () => {
         <h1 className="text-3xl font-bold">My Classes</h1>
         <p className="text-muted-foreground">Track your course progress and access learning materials</p>
       </div>
+
+      {/* Substitute Manager - Only for Faculty */}
+      {user?.role === 'faculty' && <SubstituteManager />}
 
       {/* Course Statistics */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -251,6 +270,17 @@ const MyClassesPage = () => {
                         <Button variant="outline" size="icon">
                           <Video className="h-4 w-4" />
                         </Button>
+                        {user?.role === 'faculty' && course.schedule && (
+                          <Button 
+                            variant="outline" 
+                            size="icon"
+                            onClick={() => handleMarkUnavailable(course)}
+                            title="Mark as unavailable"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <UserX className="h-4 w-4" />
+                          </Button>
+                        )}
                       </>
                     ) : (
                       <Button variant="outline" className="flex-1">
