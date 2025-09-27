@@ -15,11 +15,15 @@ import {
   Settings,
   Play,
   Square,
-  UserCheck
+  UserCheck,
+  Monitor
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
+import JitsiMeet from '@/components/JitsiMeet';
+import AttentionTracker from '@/components/AttentionTracker';
 
 const AttendanceTrackingPage = () => {
   const { user } = useAuth();
@@ -30,6 +34,9 @@ const AttendanceTrackingPage = () => {
   const [faceDetectionEnabled, setFaceDetectionEnabled] = useState(true);
   const [focusTrackingEnabled, setFocusTrackingEnabled] = useState(true);
   const [selectedClass, setSelectedClass] = useState('');
+  const [attentionScore, setAttentionScore] = useState(85);
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [isInLiveClass, setIsInLiveClass] = useState(false);
 
   // Mock data for live tracking
   const [liveStudents, setLiveStudents] = useState([
@@ -84,8 +91,28 @@ const AttendanceTrackingPage = () => {
   const sessionStats = {
     totalStudents: 25,
     presentStudents: 22,
-    averageFocus: 78,
+    averageFocus: attentionScore,
     alerts: 3
+  };
+
+  const handleAttentionUpdate = (score: number) => {
+    setAttentionScore(score);
+  };
+
+  const handleFaceDetected = (detected: boolean) => {
+    setFaceDetected(detected);
+  };
+
+  const handleJoinMeeting = () => {
+    setIsInLiveClass(true);
+  };
+
+  const handleLeaveMeeting = () => {
+    setIsInLiveClass(false);
+  };
+
+  const getRoomName = () => {
+    return selectedClass ? `class-${selectedClass}` : `class-${userRole}-${user?.name?.replace(/\s+/g, '-').toLowerCase()}`;
   };
 
   useEffect(() => {
@@ -159,132 +186,173 @@ const AttendanceTrackingPage = () => {
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Live Class Attendance</h1>
+            <h1 className="text-3xl font-bold">Live Class</h1>
             <p className="text-muted-foreground">Join your live class and track your engagement</p>
           </div>
+          <Badge variant="outline" className="flex items-center gap-2">
+            <Monitor className="h-4 w-4" />
+            Student Mode
+          </Badge>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Camera className="h-5 w-5" />
-                Camera Feed
-              </CardTitle>
-              <CardDescription>Your camera feed for attendance verification</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="relative">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-64 bg-gray-100 rounded-lg object-cover"
-                />
-                {!cameraEnabled && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
-                    <div className="text-center">
-                      <Camera className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                      <p className="text-gray-600">Camera not started</p>
-                    </div>
-                  </div>
-                )}
-                {cameraEnabled && (
-                  <div className="absolute top-2 right-2">
-                    <Badge className="bg-red-500 hover:bg-red-600">
-                      <div className="w-2 h-2 bg-white rounded-full mr-1 animate-pulse" />
-                      LIVE
-                    </Badge>
-                  </div>
-                )}
-              </div>
-              <Button 
-                onClick={toggleTracking} 
-                className="w-full"
-                variant={isTracking ? "destructive" : "default"}
-              >
-                {isTracking ? (
-                  <>
-                    <Square className="h-4 w-4 mr-2" />
-                    Stop Tracking
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 mr-2" />
-                    Start Tracking
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Eye className="h-5 w-5" />
-                Your Status
-              </CardTitle>
-              <CardDescription>Real-time attendance and engagement status</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4">
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    <span>Attendance Status</span>
-                  </div>
-                  <Badge className="bg-green-500 hover:bg-green-600">Present</Badge>
-                </div>
-
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Camera className="h-5 w-5 text-blue-500" />
-                    <span>Face Detection</span>
-                  </div>
-                  <Badge variant={cameraEnabled ? "default" : "outline"}>
-                    {cameraEnabled ? "Active" : "Inactive"}
+        <Tabs defaultValue="live-class" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="live-class">Live Class</TabsTrigger>
+            <TabsTrigger value="attention">Attention Tracking</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="live-class" className="space-y-6">
+            <JitsiMeet
+              roomName={getRoomName()}
+              displayName={user?.name || 'Student'}
+              userRole="student"
+              onJoinMeeting={handleJoinMeeting}
+              onLeaveMeeting={handleLeaveMeeting}
+            />
+            
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Class Status</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Badge className={isInLiveClass ? "bg-green-500 hover:bg-green-600" : "bg-gray-500"}>
+                    {isInLiveClass ? "In Class" : "Not Joined"}
                   </Badge>
-                </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Attention Score</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">{attentionScore}%</div>
+                  <Progress value={attentionScore} className="mt-2" />
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Face Detection</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Badge variant={faceDetected ? "default" : "outline"}>
+                    {faceDetected ? "Detected" : "Not Detected"}
+                  </Badge>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="attention" className="space-y-6">
+            <AttentionTracker
+              isActive={isTracking}
+              onAttentionUpdate={handleAttentionUpdate}
+              onFaceDetected={handleFaceDetected}
+            />
+            
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Eye className="h-5 w-5" />
+                    Your Status
+                  </CardTitle>
+                  <CardDescription>Real-time attendance and engagement status</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4">
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        <span>Attendance Status</span>
+                      </div>
+                      <Badge className="bg-green-500 hover:bg-green-600">Present</Badge>
+                    </div>
 
-                <div className="p-3 border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">Focus Level</span>
-                    <span className="text-sm font-semibold text-green-600">85%</span>
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Camera className="h-5 w-5 text-blue-500" />
+                        <span>Face Detection</span>
+                      </div>
+                      <Badge variant={faceDetected ? "default" : "outline"}>
+                        {faceDetected ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+
+                    <div className="p-3 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium">Attention Level</span>
+                        <span className="text-sm font-semibold text-green-600">{attentionScore}%</span>
+                      </div>
+                      <Progress value={attentionScore} className="h-2" />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {attentionScore >= 80 ? "Excellent focus!" : 
+                         attentionScore >= 60 ? "Good attention" : 
+                         "Please focus on the class"}
+                      </p>
+                    </div>
+
+                    <div className="p-3 border rounded-lg">
+                      <div className="text-sm space-y-1">
+                        <div className="flex justify-between">
+                          <span>Join Time:</span>
+                          <span className="font-medium">09:05 AM</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Session Duration:</span>
+                          <span className="font-medium">1h 25m</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Engagement Score:</span>
+                          <span className={`font-medium ${
+                            attentionScore >= 80 ? 'text-green-600' : 
+                            attentionScore >= 60 ? 'text-yellow-600' : 'text-red-600'
+                          }`}>
+                            {attentionScore >= 80 ? 'A+' : attentionScore >= 60 ? 'B' : 'C'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <Progress value={85} className="h-2" />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Great focus! Keep it up.
-                  </p>
-                </div>
+                </CardContent>
+              </Card>
 
-                <div className="p-3 border rounded-lg">
-                  <div className="text-sm space-y-1">
-                    <div className="flex justify-between">
-                      <span>Join Time:</span>
-                      <span className="font-medium">09:05 AM</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Session Duration:</span>
-                      <span className="font-medium">1h 25m</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Engagement Score:</span>
-                      <span className="font-medium text-green-600">A+</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            Your attendance is being tracked automatically. Stay engaged and keep your camera on for accurate tracking.
-          </AlertDescription>
-        </Alert>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tracking Controls</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Button 
+                    onClick={toggleTracking} 
+                    className="w-full"
+                    variant={isTracking ? "destructive" : "default"}
+                  >
+                    {isTracking ? (
+                      <>
+                        <Square className="h-4 w-4 mr-2" />
+                        Stop Attention Tracking
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 mr-2" />
+                        Start Attention Tracking
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      Your attention is being tracked using AI. Stay focused and keep your face visible for accurate monitoring.
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     );
   }
@@ -293,10 +361,14 @@ const AttendanceTrackingPage = () => {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Live Attendance Tracking</h1>
-          <p className="text-muted-foreground">Monitor student attendance and engagement in real-time</p>
+          <h1 className="text-3xl font-bold">Live Class Management</h1>
+          <p className="text-muted-foreground">Conduct live classes and monitor student attendance & engagement</p>
         </div>
         <div className="flex gap-2">
+          <Badge variant="outline" className="flex items-center gap-2">
+            <Monitor className="h-4 w-4" />
+            Faculty Mode
+          </Badge>
           <Button variant="outline">
             <Settings className="h-4 w-4 mr-2" />
             Settings
@@ -317,153 +389,183 @@ const AttendanceTrackingPage = () => {
         </div>
       </div>
 
-      {/* Session Controls */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Session Configuration</CardTitle>
-          <CardDescription>Configure tracking settings for the current session</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Select Class</label>
-              <Select value={selectedClass} onValueChange={setSelectedClass}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a class" />
-                </SelectTrigger>
-                <SelectContent>
-                  {classes.map((cls) => (
-                    <SelectItem key={cls.id} value={cls.id}>
-                      {cls.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="space-y-0.5">
-                <label className="text-sm font-medium">Face Detection</label>
-                <p className="text-xs text-muted-foreground">Automatically detect student presence</p>
-              </div>
-              <Switch checked={faceDetectionEnabled} onCheckedChange={setFaceDetectionEnabled} />
-            </div>
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="space-y-0.5">
-                <label className="text-sm font-medium">Focus Tracking</label>
-                <p className="text-xs text-muted-foreground">Monitor student engagement levels</p>
-              </div>
-              <Switch checked={focusTrackingEnabled} onCheckedChange={setFocusTrackingEnabled} />
-            </div>
+      <Tabs defaultValue="live-class" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="live-class">Live Class</TabsTrigger>
+          <TabsTrigger value="monitoring">Student Monitoring</TabsTrigger>
+          <TabsTrigger value="settings">Session Settings</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="live-class" className="space-y-6">
+          <JitsiMeet
+            roomName={getRoomName()}
+            displayName={user?.name || 'Teacher'}
+            userRole="faculty"
+            onJoinMeeting={handleJoinMeeting}
+            onLeaveMeeting={handleLeaveMeeting}
+          />
+          
+          {/* Live Stats */}
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{sessionStats.totalStudents}</div>
+                <p className="text-xs text-muted-foreground">Enrolled in session</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Present</CardTitle>
+                <UserCheck className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{sessionStats.presentStudents}</div>
+                <p className="text-xs text-muted-foreground">
+                  {Math.round((sessionStats.presentStudents / sessionStats.totalStudents) * 100)}% attendance rate
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Avg Attention</CardTitle>
+                <Eye className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{sessionStats.averageFocus}%</div>
+                <Progress value={sessionStats.averageFocus} className="mt-2" />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Alerts</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">{sessionStats.alerts}</div>
+                <p className="text-xs text-muted-foreground">Require attention</p>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+        
+        <TabsContent value="monitoring" className="space-y-6">
 
-      {/* Live Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{sessionStats.totalStudents}</div>
-            <p className="text-xs text-muted-foreground">Enrolled in session</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Present</CardTitle>
-            <UserCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{sessionStats.presentStudents}</div>
-            <p className="text-xs text-muted-foreground">
-              {Math.round((sessionStats.presentStudents / sessionStats.totalStudents) * 100)}% attendance rate
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Focus</CardTitle>
-            <Eye className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{sessionStats.averageFocus}%</div>
-            <Progress value={sessionStats.averageFocus} className="mt-2" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alerts</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{sessionStats.alerts}</div>
-            <p className="text-xs text-muted-foreground">Require attention</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Live Student Tracking */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Video className="h-5 w-5" />
-            Live Student Monitoring
-          </CardTitle>
-          <CardDescription>Real-time tracking of student presence and engagement</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {liveStudents.map((student) => (
-              <div key={student.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                      <span className="font-semibold text-primary text-sm">
-                        {student.name.split(' ').map(n => n[0]).join('')}
-                      </span>
-                    </div>
-                    {student.faceDetected && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white">
-                        <Camera className="w-2 h-2 text-white m-0.5" />
+          {/* Live Student Tracking */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Video className="h-5 w-5" />
+                Live Student Monitoring
+              </CardTitle>
+              <CardDescription>Real-time tracking of student presence and engagement</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {liveStudents.map((student) => (
+                  <div key={student.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-4">
+                      <div className="relative">
+                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                          <span className="font-semibold text-primary text-sm">
+                            {student.name.split(' ').map(n => n[0]).join('')}
+                          </span>
+                        </div>
+                        {student.faceDetected && (
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white">
+                            <Camera className="w-2 h-2 text-white m-0.5" />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="font-medium">{student.name}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {student.rollNo} • Joined: {student.joinTime}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm">Focus:</span>
-                      <span className={`font-semibold ${getFocusColor(student.focusLevel)}`}>
-                        {student.focusLevel}%
-                      </span>
+                      <div>
+                        <h4 className="font-medium">{student.name}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {student.rollNo} • Joined: {student.joinTime}
+                        </p>
+                      </div>
                     </div>
-                    <Progress value={student.focusLevel} className="w-20 h-2" />
+                    
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm">Attention:</span>
+                          <span className={`font-semibold ${getFocusColor(student.focusLevel)}`}>
+                            {student.focusLevel}%
+                          </span>
+                        </div>
+                        <Progress value={student.focusLevel} className="w-20 h-2" />
+                      </div>
+                      
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Last seen: {student.lastSeen}
+                        </p>
+                        {getStatusBadge(student.status)}
+                      </div>
+                    </div>
                   </div>
-                  
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground mb-1">
-                      Last seen: {student.lastSeen}
-                    </p>
-                    {getStatusBadge(student.status)}
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="settings" className="space-y-6">
+          {/* Session Controls */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Session Configuration</CardTitle>
+              <CardDescription>Configure tracking settings for the current session</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Select Class</label>
+                  <Select value={selectedClass} onValueChange={setSelectedClass}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a class" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {classes.map((cls) => (
+                        <SelectItem key={cls.id} value={cls.id}>
+                          {cls.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-medium">Face Detection</label>
+                    <p className="text-xs text-muted-foreground">Automatically detect student presence</p>
                   </div>
+                  <Switch checked={faceDetectionEnabled} onCheckedChange={setFaceDetectionEnabled} />
+                </div>
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-medium">Attention Tracking</label>
+                    <p className="text-xs text-muted-foreground">Monitor student engagement levels using AI</p>
+                  </div>
+                  <Switch checked={focusTrackingEnabled} onCheckedChange={setFocusTrackingEnabled} />
                 </div>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+
+          {/* Demo Attention Tracker for Faculty */}
+          <AttentionTracker
+            isActive={focusTrackingEnabled}
+            onAttentionUpdate={handleAttentionUpdate}
+            onFaceDetected={handleFaceDetected}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Alerts */}
       {sessionStats.alerts > 0 && (
