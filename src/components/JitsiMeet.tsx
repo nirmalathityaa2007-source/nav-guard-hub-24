@@ -41,13 +41,21 @@ const JitsiMeet: React.FC<JitsiMeetProps> = ({
       },
       configOverwrite: {
         startWithAudioMuted: userRole === 'student',
-        startWithVideoMuted: false,
+        startWithVideoMuted: false, // Always start with video enabled
         enableWelcomePage: false,
         prejoinPageEnabled: false,
         disableModeratorIndicator: false,
         startScreenSharing: false,
         enableEmailInStats: false,
         enableClosePage: false,
+        resolution: 720,
+        constraints: {
+          video: {
+            aspectRatio: 16 / 9,
+            height: { ideal: 720, max: 1080, min: 240 },
+            width: { ideal: 1280, max: 1920, min: 320 }
+          }
+        },
         toolbarButtons: [
           'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
           'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',
@@ -61,6 +69,9 @@ const JitsiMeet: React.FC<JitsiMeetProps> = ({
         SHOW_JITSI_WATERMARK: false,
         SHOW_WATERMARK_FOR_GUESTS: false,
         DEFAULT_BACKGROUND: '#1a1a1a',
+        FILM_STRIP_MAX_HEIGHT: 120,
+        ENABLE_FEEDBACK_ANIMATION: false,
+        DISABLE_VIDEO_BACKGROUND: false,
         TOOLBAR_BUTTONS: userRole === 'faculty' ? [
           'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
           'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',

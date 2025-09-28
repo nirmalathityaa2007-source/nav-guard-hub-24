@@ -248,6 +248,7 @@ const AttendanceTrackingPage = () => {
           <TabsContent value="attention" className="space-y-6">
             <AttentionTracker
               isActive={isTracking}
+              isInLiveClass={isInLiveClass}
               onAttentionUpdate={handleAttentionUpdate}
               onFaceDetected={handleFaceDetected}
             />
@@ -328,6 +329,7 @@ const AttendanceTrackingPage = () => {
                     onClick={toggleTracking} 
                     className="w-full"
                     variant={isTracking ? "destructive" : "default"}
+                    disabled={isInLiveClass}
                   >
                     {isTracking ? (
                       <>
@@ -337,7 +339,7 @@ const AttendanceTrackingPage = () => {
                     ) : (
                       <>
                         <Play className="h-4 w-4 mr-2" />
-                        Start Attention Tracking
+                        {isInLiveClass ? "Available after live class" : "Start Attention Tracking"}
                       </>
                     )}
                   </Button>
@@ -345,7 +347,10 @@ const AttendanceTrackingPage = () => {
                   <Alert>
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
-                      Your attention is being tracked using AI. Stay focused and keep your face visible for accurate monitoring.
+                      {isInLiveClass 
+                        ? "Attention tracking is automatically managed during live classes through video conferencing."
+                        : "Your attention is being tracked using AI. Stay focused and keep your face visible for accurate monitoring."
+                      }
                     </AlertDescription>
                   </Alert>
                 </CardContent>

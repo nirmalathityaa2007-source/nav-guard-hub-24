@@ -8,12 +8,14 @@ import { Eye, Camera, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 interface AttentionTrackerProps {
   isActive: boolean;
+  isInLiveClass?: boolean;
   onAttentionUpdate?: (score: number) => void;
   onFaceDetected?: (detected: boolean) => void;
 }
 
 const AttentionTracker: React.FC<AttentionTrackerProps> = ({
   isActive,
+  isInLiveClass = false,
   onAttentionUpdate,
   onFaceDetected
 }) => {
@@ -46,7 +48,8 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
   }, []);
 
   useEffect(() => {
-    if (isActive && faceModel) {
+    // Only start camera if active and NOT in a live class (to avoid conflicts with JitsiMeet)
+    if (isActive && faceModel && !isInLiveClass) {
       startCamera();
     } else {
       stopCamera();
@@ -57,7 +60,7 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isActive, faceModel]);
+  }, [isActive, faceModel, isInLiveClass]);
 
   const startCamera = async () => {
     try {
@@ -291,11 +294,16 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
             className="absolute top-0 left-0 w-full h-48 rounded-lg"
             style={{ display: isActive ? 'block' : 'none' }}
           />
-          {!isActive && (
+          {(!isActive || isInLiveClass) && (
             <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
               <div className="text-center text-gray-500">
                 <Camera className="h-8 w-8 mx-auto mb-2" />
-                <p>Attention tracking inactive</p>
+                <p>
+                  {isInLiveClass 
+                    ? "Attention tracking disabled during live class" 
+                    : "Attention tracking inactive"
+                  }
+                </p>
               </div>
             </div>
           )}
