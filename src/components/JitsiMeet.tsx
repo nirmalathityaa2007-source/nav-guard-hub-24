@@ -9,6 +9,7 @@ interface JitsiMeetProps {
   userRole: 'student' | 'faculty' | 'admin';
   onJoinMeeting?: () => void;
   onLeaveMeeting?: () => void;
+  onVideoStreamReady?: (stream: MediaStream) => void;
 }
 
 const JitsiMeet: React.FC<JitsiMeetProps> = ({
@@ -16,7 +17,8 @@ const JitsiMeet: React.FC<JitsiMeetProps> = ({
   displayName,
   userRole,
   onJoinMeeting,
-  onLeaveMeeting
+  onLeaveMeeting,
+  onVideoStreamReady
 }) => {
   const jitsiContainerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<any>(null);
@@ -104,6 +106,29 @@ const JitsiMeet: React.FC<JitsiMeetProps> = ({
         apiRef.current.addEventListener('videoConferenceLeft', () => {
           onLeaveMeeting?.();
         });
+
+        // Get video stream for attention tracking (students only)
+        if (userRole === 'student' && onVideoStreamReady) {
+          apiRef.current.addEventListener('videoConferenceJoined', async () => {
+            try {
+              // Wait a bit for Jitsi to fully initialize
+              setTimeout(async () => {
+                try {
+                  const tracks = await apiRef.current.getLocalTracks();
+                  const videoTrack = tracks.find((track: any) => track.getType() === 'video');
+                  if (videoTrack) {
+                    const stream = new MediaStream([videoTrack.track]);
+                    onVideoStreamReady(stream);
+                  }
+                } catch (error) {
+                  console.warn('Could not get video stream for attention tracking:', error);
+                }
+              }, 2000);
+            } catch (error) {
+              console.warn('Error setting up video stream:', error);
+            }
+          });
+        }
       }
     };
 

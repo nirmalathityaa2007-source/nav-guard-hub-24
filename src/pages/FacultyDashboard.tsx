@@ -2,8 +2,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AttendanceWidget from '@/components/AttendanceWidget';
 import SubstituteManager from '@/components/SubstituteManager';
+import LiveClassManager from '@/components/LiveClassManager';
+import AttentionDashboard from '@/components/AttentionDashboard';
 import {
   Users,
   BookOpen,
@@ -15,7 +18,8 @@ import {
   Video,
   BarChart3,
   UserCheck,
-  UserX
+  UserX,
+  Eye
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTimetable } from '@/contexts/TimetableContext';
@@ -32,6 +36,16 @@ const FacultyDashboard = () => {
 
       {/* Substitute Manager */}
       <SubstituteManager />
+
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="live-class">Live Class</TabsTrigger>
+          <TabsTrigger value="attention">Student Attention</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -149,6 +163,65 @@ const FacultyDashboard = () => {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="live-class" className="space-y-6">
+          <LiveClassManager
+            userRole="faculty"
+            userName="Dr. Johnson"
+            roomName="mathematics-101"
+            className="Mathematics 101 - Advanced Calculus"
+          />
+        </TabsContent>
+
+        <TabsContent value="attention" className="space-y-6">
+          <AttentionDashboard userRole="faculty" />
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Attendance Widget */}
+            <AttendanceWidget variant="faculty" />
+
+            {/* Recent Student Activity */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Student Activity</CardTitle>
+                <CardDescription>Latest submissions and activities</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {[
+                  { student: 'Alice Johnson', activity: 'Submitted Assignment 3', course: 'Calculus I', time: '10 min ago', status: 'submitted' },
+                  { student: 'Bob Smith', activity: 'Attended Live Class', course: 'Statistics', time: '1 hour ago', status: 'attended' },
+                  { student: 'Carol Davis', activity: 'Submitted Quiz 2', course: 'Linear Algebra', time: '2 hours ago', status: 'submitted' },
+                  { student: 'David Wilson', activity: 'Requested Help', course: 'Advanced Mathematics', time: '3 hours ago', status: 'help' }
+                ].map((activity, index) => (
+                  <div key={index} className="flex items-start space-x-3">
+                    <div className={`p-2 rounded-full ${
+                      activity.status === 'submitted' ? 'bg-success/10' :
+                      activity.status === 'attended' ? 'bg-primary/10' :
+                      activity.status === 'help' ? 'bg-warning/10' : 'bg-muted'
+                    }`}>
+                      {activity.status === 'submitted' ? <CheckCircle className="h-4 w-4 text-success" /> :
+                       activity.status === 'attended' ? <Video className="h-4 w-4 text-primary" /> :
+                       activity.status === 'help' ? <Clock className="h-4 w-4 text-warning" /> :
+                       <FileText className="h-4 w-4 text-muted-foreground" />}
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <h4 className="font-medium">{activity.student}</h4>
+                      <p className="text-sm text-muted-foreground">{activity.activity}</p>
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{activity.course}</span>
+                        <span>{activity.time}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

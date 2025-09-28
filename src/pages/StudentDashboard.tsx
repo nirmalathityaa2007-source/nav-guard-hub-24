@@ -3,7 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AttendanceWidget from '@/components/AttendanceWidget';
+import LiveClassManager from '@/components/LiveClassManager';
+import AttentionDashboard from '@/components/AttentionDashboard';
 import {
   BookOpen,
   Calendar,
@@ -13,11 +16,13 @@ import {
   AlertCircle,
   Video,
   FileText,
-  UserCheck
+  UserCheck,
+  Eye
 } from 'lucide-react';
 
 const StudentDashboard = () => {
   const [isLoading] = useState(false);
+  const [currentAttentionScore, setCurrentAttentionScore] = useState(85);
 
   if (isLoading) {
     return (
@@ -40,6 +45,16 @@ const StudentDashboard = () => {
         <h1 className="text-3xl font-bold">Welcome back, Alex!</h1>
         <p className="text-muted-foreground">Here's what's happening with your studies today.</p>
       </div>
+
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="live-class">Live Class</TabsTrigger>
+          <TabsTrigger value="attention">Attention</TabsTrigger>
+          <TabsTrigger value="courses">Courses</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -181,6 +196,92 @@ const StudentDashboard = () => {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="live-class" className="space-y-6">
+          <LiveClassManager
+            userRole="student"
+            userName="Alex Johnson"
+            roomName="mathematics-101"
+            className="Mathematics 101"
+          />
+        </TabsContent>
+
+        <TabsContent value="attention" className="space-y-6">
+          <AttentionDashboard
+            userRole="student"
+            currentAttentionScore={currentAttentionScore}
+          />
+        </TabsContent>
+
+        <TabsContent value="courses" className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-3">
+            {/* Current Courses - moved from overview */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Current Courses</CardTitle>
+                <CardDescription>Your enrolled courses this semester</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {[
+                  { name: 'Mathematics 101', progress: 75, status: 'active', nextClass: 'Today 2:30 PM' },
+                  { name: 'Physics Fundamentals', progress: 60, status: 'active', nextClass: 'Tomorrow 10:00 AM' },
+                  { name: 'Computer Science', progress: 85, status: 'active', nextClass: 'Wed 1:00 PM' },
+                ].map((course, index) => (
+                  <div key={index} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">{course.name}</h4>
+                      <Badge variant={course.status === 'active' ? 'default' : 'secondary'}>
+                        {course.status}
+                      </Badge>
+                    </div>
+                    <Progress value={course.progress} className="h-2" />
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>{course.progress}% complete</span>
+                      <span>{course.nextClass}</span>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Attendance Widget */}
+            <AttendanceWidget variant="student" />
+
+            {/* Upcoming Assignments */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Upcoming Assignments</CardTitle>
+                <CardDescription>Assignments due soon</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {[
+                  { title: 'Math Problem Set 5', course: 'Mathematics 101', dueDate: 'Due Tomorrow', priority: 'high' },
+                  { title: 'Physics Lab Report', course: 'Physics Fundamentals', dueDate: 'Due Friday', priority: 'medium' },
+                  { title: 'Programming Project', course: 'Computer Science', dueDate: 'Due Next Week', priority: 'low' },
+                ].map((assignment, index) => (
+                  <div key={index} className="flex items-start space-x-4">
+                    <div className={`p-2 rounded-full ${
+                      assignment.priority === 'high' ? 'bg-destructive/10' :
+                      assignment.priority === 'medium' ? 'bg-warning/10' : 'bg-muted'
+                    }`}>
+                      <AlertCircle className={`h-4 w-4 ${
+                        assignment.priority === 'high' ? 'text-destructive' :
+                        assignment.priority === 'medium' ? 'text-warning' : 'text-muted-foreground'
+                      }`} />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <h4 className="font-medium">{assignment.title}</h4>
+                      <p className="text-sm text-muted-foreground">{assignment.course}</p>
+                      <p className="text-sm font-medium">{assignment.dueDate}</p>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

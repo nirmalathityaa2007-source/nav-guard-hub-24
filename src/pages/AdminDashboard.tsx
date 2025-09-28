@@ -1,6 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import AttentionDashboard from '@/components/AttentionDashboard';
 import {
   Users,
   BookOpen,
@@ -12,7 +14,9 @@ import {
   Database,
   Settings,
   UserPlus,
-  FileBarChart
+  FileBarChart,
+  Eye,
+  Monitor
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -22,6 +26,16 @@ const AdminDashboard = () => {
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
         <p className="text-muted-foreground">System overview and administration panel.</p>
       </div>
+
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="attention">Attention Analytics</TabsTrigger>
+          <TabsTrigger value="system">System Status</TabsTrigger>
+          <TabsTrigger value="management">Management</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
 
       {/* System Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -163,6 +177,13 @@ const AdminDashboard = () => {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="attention" className="space-y-6">
+          <AttentionDashboard userRole="admin" />
+        </TabsContent>
+
+        <TabsContent value="system" className="space-y-6">
 
       {/* System Status */}
       <div className="grid gap-6 md:grid-cols-3">
@@ -241,6 +262,76 @@ const AdminDashboard = () => {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+
+        <TabsContent value="management" className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* User Management Overview */}
+            <Card>
+              <CardHeader>
+                <CardTitle>User Management</CardTitle>
+                <CardDescription>Overview of system users by role</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {[
+                  { role: 'Students', count: 2456, percentage: 86, color: 'student' },
+                  { role: 'Faculty', count: 378, percentage: 13, color: 'faculty' },
+                  { role: 'Administrators', count: 13, percentage: 1, color: 'admin' }
+                ].map((userType, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-3 h-3 rounded-full ${
+                        userType.color === 'student' ? 'bg-student' :
+                        userType.color === 'faculty' ? 'bg-faculty' : 'bg-admin'
+                      }`} />
+                      <span className="font-medium">{userType.role}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-muted-foreground">{userType.count}</span>
+                      <Badge variant="secondary">{userType.percentage}%</Badge>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* System Alerts */}
+            <Card>
+              <CardHeader>
+                <CardTitle>System Alerts</CardTitle>
+                <CardDescription>Recent system notifications</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {[
+                  { title: 'High CPU Usage', description: 'Server load at 85%', severity: 'warning', time: '5 min ago' },
+                  { title: 'Database Backup Complete', description: 'Daily backup successful', severity: 'success', time: '1 hour ago' },
+                  { title: 'Failed Login Attempts', description: '3 failed attempts detected', severity: 'error', time: '2 hours ago' },
+                  { title: 'System Update Available', description: 'Security patch ready', severity: 'info', time: '1 day ago' }
+                ].map((alert, index) => (
+                  <div key={index} className="flex items-start space-x-3">
+                    <div className={`p-2 rounded-full ${
+                      alert.severity === 'error' ? 'bg-destructive/10' :
+                      alert.severity === 'warning' ? 'bg-warning/10' :
+                      alert.severity === 'success' ? 'bg-success/10' : 'bg-primary/10'
+                    }`}>
+                      <AlertTriangle className={`h-4 w-4 ${
+                        alert.severity === 'error' ? 'text-destructive' :
+                        alert.severity === 'warning' ? 'text-warning' :
+                        alert.severity === 'success' ? 'text-success' : 'text-primary'
+                      }`} />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <h4 className="font-medium">{alert.title}</h4>
+                      <p className="text-sm text-muted-foreground">{alert.description}</p>
+                      <p className="text-xs text-muted-foreground">{alert.time}</p>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

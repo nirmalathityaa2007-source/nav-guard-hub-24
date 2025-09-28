@@ -9,6 +9,7 @@ import { Eye, Camera, AlertTriangle, CheckCircle2 } from 'lucide-react';
 interface AttentionTrackerProps {
   isActive: boolean;
   isInLiveClass?: boolean;
+  externalVideoStream?: MediaStream | null;
   onAttentionUpdate?: (score: number) => void;
   onFaceDetected?: (detected: boolean) => void;
 }
@@ -16,6 +17,7 @@ interface AttentionTrackerProps {
 const AttentionTracker: React.FC<AttentionTrackerProps> = ({
   isActive,
   isInLiveClass = false,
+  externalVideoStream = null,
   onAttentionUpdate,
   onFaceDetected
 }) => {
@@ -48,9 +50,16 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
   }, []);
 
   useEffect(() => {
-    // Only start camera if active and NOT in a live class (to avoid conflicts with JitsiMeet)
-    if (isActive && faceModel && !isInLiveClass) {
-      startCamera();
+    if (isActive && faceModel) {
+      if (externalVideoStream) {
+        // Use external video stream from Jitsi
+        useExternalStream();
+      } else if (!isInLiveClass) {
+        // Only start own camera if not in live class and no external stream
+        startCamera();
+      } else {
+        stopCamera();
+      }
     } else {
       stopCamera();
     }
@@ -60,7 +69,7 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isActive, faceModel, isInLiveClass]);
+  }, [isActive, faceModel, isInLiveClass, externalVideoStream]);
 
   const startCamera = async () => {
     try {
@@ -84,8 +93,18 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
     }
   };
 
+  const useExternalStream = () => {
+    if (videoRef.current && externalVideoStream) {
+      videoRef.current.srcObject = externalVideoStream;
+      videoRef.current.onloadedmetadata = () => {
+        detectFaces();
+      };
+    }
+  };
+
   const stopCamera = () => {
-    if (videoRef.current?.srcObject) {
+    if (videoRef.current?.srcObject && !externalVideoStream) {
+      // Only stop if it's our own camera stream, not external
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
       videoRef.current.srcObject = null;
@@ -294,13 +313,13 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
             className="absolute top-0 left-0 w-full h-48 rounded-lg"
             style={{ display: isActive ? 'block' : 'none' }}
           />
-          {(!isActive || isInLiveClass) && (
+          {(!isActive || (isInLiveClass && !externalVideoStream)) && (
             <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
               <div className="text-center text-gray-500">
                 <Camera className="h-8 w-8 mx-auto mb-2" />
                 <p>
-                  {isInLiveClass 
-                    ? "Attention tracking disabled during live class" 
+                  {isInLiveClass && !externalVideoStream
+                    ? "Waiting for live class video stream..." 
                     : "Attention tracking inactive"
                   }
                 </p>
