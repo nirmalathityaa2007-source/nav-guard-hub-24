@@ -95,10 +95,10 @@ const LiveClassManager: React.FC<LiveClassManagerProps> = ({
 
         {/* Attention Tracking & Stats */}
         <div className="space-y-4">
-          {userRole === 'student' && (
+          {userRole === 'student' && isInClass && (
             <AttentionTracker
-              isActive={isInClass}
-              isInLiveClass={isInClass}
+              isActive={true}
+              isInLiveClass={true}
               externalVideoStream={videoStream}
               onAttentionUpdate={handleAttentionUpdate}
               onFaceDetected={handleFaceDetected}
