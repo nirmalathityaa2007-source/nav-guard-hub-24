@@ -305,16 +305,16 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
             autoPlay
             playsInline
             muted
-            className="w-full h-48 bg-gray-100 rounded-lg object-cover"
+            className="w-full h-64 bg-background rounded-lg object-cover border"
             style={{ display: isActive ? 'block' : 'none' }}
           />
           <canvas
             ref={canvasRef}
-            className="absolute top-0 left-0 w-full h-48 rounded-lg"
+            className="absolute top-0 left-0 w-full h-64 rounded-lg"
             style={{ display: isActive ? 'block' : 'none' }}
           />
           {(!isActive || (isInLiveClass && !externalVideoStream)) && (
-            <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
+            <div className="w-full h-64 bg-muted rounded-lg flex items-center justify-center border">
               <div className="text-center text-gray-500">
                 <Camera className="h-8 w-8 mx-auto mb-2" />
                 <p>

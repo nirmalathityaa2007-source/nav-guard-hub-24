@@ -35,7 +35,7 @@ const JitsiMeet: React.FC<JitsiMeetProps> = ({
     const options = {
       roomName: roomName || 'live-class-room',
       width: '100%',
-      height: 400,
+      height: 500,
       parentNode: jitsiContainerRef.current,
       userInfo: {
         displayName: displayName || 'User',
@@ -43,7 +43,7 @@ const JitsiMeet: React.FC<JitsiMeetProps> = ({
       },
       configOverwrite: {
         startWithAudioMuted: userRole === 'student',
-        startWithVideoMuted: false, // Always start with video enabled
+        startWithVideoMuted: false,
         enableWelcomePage: false,
         prejoinPageEnabled: false,
         disableModeratorIndicator: false,
@@ -54,26 +54,34 @@ const JitsiMeet: React.FC<JitsiMeetProps> = ({
         constraints: {
           video: {
             aspectRatio: 16 / 9,
-            height: { ideal: 720, max: 1080, min: 240 },
-            width: { ideal: 1280, max: 1920, min: 320 }
+            height: { ideal: 720, max: 1080, min: 480 },
+            width: { ideal: 1280, max: 1920, min: 640 }
           }
         },
-        toolbarButtons: [
-          'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
-          'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',
-          'livestreaming', 'etherpad', 'sharedvideo', 'settings', 'raisehand',
-          'videoquality', 'filmstrip', 'invite', 'feedback', 'stats', 'shortcuts',
-          'tileview', 'videobackgroundblur', 'download', 'help', 'mute-everyone'
-        ]
+        disableDeepLinking: true,
+        disableInviteFunctions: false,
+        doNotStoreRoom: false,
+        enableNoisyMicDetection: true,
+        p2p: {
+          enabled: true,
+          stunServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+          ]
+        }
       },
       interfaceConfigOverwrite: {
-        DISABLE_JOIN_LEAVE_NOTIFICATIONS: userRole === 'faculty',
+        DISABLE_JOIN_LEAVE_NOTIFICATIONS: false,
         SHOW_JITSI_WATERMARK: false,
         SHOW_WATERMARK_FOR_GUESTS: false,
-        DEFAULT_BACKGROUND: '#1a1a1a',
+        DEFAULT_BACKGROUND: '#000000',
         FILM_STRIP_MAX_HEIGHT: 120,
         ENABLE_FEEDBACK_ANIMATION: false,
         DISABLE_VIDEO_BACKGROUND: false,
+        SHOW_CHROME_EXTENSION_BANNER: false,
+        MOBILE_APP_PROMO: false,
+        NATIVE_APP_NAME: 'EduPlatform Live Class',
+        PROVIDER_NAME: 'EduPlatform',
         TOOLBAR_BUTTONS: userRole === 'faculty' ? [
           'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
           'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',
@@ -171,8 +179,8 @@ const JitsiMeet: React.FC<JitsiMeetProps> = ({
       <CardContent>
         <div 
           ref={jitsiContainerRef} 
-          className="w-full rounded-lg overflow-hidden border bg-gray-900"
-          style={{ minHeight: '400px' }}
+          className="w-full rounded-lg overflow-hidden border bg-background"
+          style={{ minHeight: '500px' }}
         />
         <div className="mt-4 text-xs text-muted-foreground space-y-1">
           <p>• Room: {roomName}</p>
