@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import JitsiMeet from './JitsiMeet';
+import JitsiMeetStable from './JitsiMeetStable';
 import AttentionTracker from './AttentionTracker';
 import { Video, Users, Eye, Clock, TrendingUp } from 'lucide-react';
 
@@ -83,7 +83,7 @@ const LiveClassManager: React.FC<LiveClassManagerProps> = ({
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Live Class Video */}
         <div className="lg:col-span-2">
-          <JitsiMeet
+          <JitsiMeetStable
             roomName={roomName}
             displayName={userName}
             userRole={userRole}

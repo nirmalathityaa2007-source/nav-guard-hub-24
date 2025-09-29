@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import JitsiMeet from '@/components/JitsiMeet';
+import JitsiMeetStable from '@/components/JitsiMeetStable';
 import AttentionTracker from '@/components/AttentionTracker';
 
 const AttendanceTrackingPage = () => {
@@ -202,7 +202,7 @@ const AttendanceTrackingPage = () => {
           </TabsList>
           
           <TabsContent value="live-class" className="space-y-6">
-            <JitsiMeet
+            <JitsiMeetStable
               roomName={getRoomName()}
               displayName={user?.name || 'Student'}
               userRole="student"
@@ -402,7 +402,7 @@ const AttendanceTrackingPage = () => {
         </TabsList>
         
         <TabsContent value="live-class" className="space-y-6">
-          <JitsiMeet
+          <JitsiMeetStable
             roomName={getRoomName()}
             displayName={user?.name || 'Teacher'}
             userRole="faculty"
