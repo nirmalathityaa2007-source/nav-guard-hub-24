@@ -108,6 +108,7 @@ const JitsiMeetStable: React.FC<JitsiMeetStableProps> = ({
           disableInviteFunctions: false,
           doNotStoreRoom: false,
           enableNoisyMicDetection: true,
+          startInFullscreen: true,
           p2p: {
             enabled: true,
             stunServers: [
@@ -128,6 +129,7 @@ const JitsiMeetStable: React.FC<JitsiMeetStableProps> = ({
           MOBILE_APP_PROMO: false,
           NATIVE_APP_NAME: 'EduPlatform Live Class',
           PROVIDER_NAME: 'EduPlatform',
+          VERTICAL_FILMSTRIP: true,
           TOOLBAR_BUTTONS: userRole === 'faculty' ? [
             'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
             'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',
@@ -144,6 +146,14 @@ const JitsiMeetStable: React.FC<JitsiMeetStableProps> = ({
         await jitsiManager.initialize(options, containerRef.current);
         setupEventListeners();
         console.log('Jitsi initialized successfully');
+        
+        // Enter fullscreen after a short delay to ensure proper initialization
+        setTimeout(() => {
+          const api = jitsiManager.getAPI();
+          if (api) {
+            api.executeCommand('toggleFullScreen');
+          }
+        }, 1000);
       } catch (error) {
         console.error('Failed to initialize Jitsi:', error);
       }

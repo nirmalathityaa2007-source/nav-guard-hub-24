@@ -141,6 +141,10 @@ class JitsiManager {
     return this.apiInstance.getLocalTracks();
   }
 
+  getAPI(): any {
+    return this.apiInstance;
+  }
+
   dispose(): void {
     console.log('Disposing Jitsi instance');
     if (this.apiInstance) {
