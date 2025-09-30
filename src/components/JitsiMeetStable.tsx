@@ -84,14 +84,14 @@ const JitsiMeetStable: React.FC<JitsiMeetStableProps> = ({
         width: '100%',
         height: 500,
         userInfo: {
-          displayName: displayName || 'User',
-          email: `${displayName?.toLowerCase().replace(' ', '.')}@school.edu`
+          displayName: displayName || 'User'
         },
         configOverwrite: {
           startWithAudioMuted: userRole === 'student',
           startWithVideoMuted: false,
           enableWelcomePage: false,
           prejoinPageEnabled: false,
+          requireDisplayName: false,
           disableModeratorIndicator: false,
           startScreenSharing: false,
           enableEmailInStats: false,
@@ -105,10 +105,9 @@ const JitsiMeetStable: React.FC<JitsiMeetStableProps> = ({
             }
           },
           disableDeepLinking: true,
-          disableInviteFunctions: false,
-          doNotStoreRoom: false,
+          disableInviteFunctions: userRole === 'student',
+          doNotStoreRoom: true,
           enableNoisyMicDetection: true,
-          startInFullscreen: true,
           p2p: {
             enabled: true,
             stunServers: [
@@ -147,13 +146,16 @@ const JitsiMeetStable: React.FC<JitsiMeetStableProps> = ({
         setupEventListeners();
         console.log('Jitsi initialized successfully');
         
-        // Enter fullscreen after a short delay to ensure proper initialization
-        setTimeout(() => {
-          const api = jitsiManager.getAPI();
-          if (api) {
-            api.executeCommand('toggleFullScreen');
-          }
-        }, 1000);
+        // Set moderator status for faculty
+        if (userRole === 'faculty') {
+          setTimeout(() => {
+            const api = jitsiManager.getAPI();
+            if (api) {
+              // Grant moderator rights
+              api.executeCommand('toggleLobby', false);
+            }
+          }, 1000);
+        }
       } catch (error) {
         console.error('Failed to initialize Jitsi:', error);
       }

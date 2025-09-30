@@ -1,11 +1,13 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
 import JitsiMeetStable from './JitsiMeetStable';
 import AttentionTracker from './AttentionTracker';
-import { Video, Users, Eye, Clock, TrendingUp } from 'lucide-react';
+import { Video, Users, Eye, Clock, TrendingUp, Copy, Check } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface LiveClassManagerProps {
   userRole: 'student' | 'faculty' | 'admin';
@@ -25,6 +27,27 @@ const LiveClassManager: React.FC<LiveClassManagerProps> = ({
   const [faceDetected, setFaceDetected] = useState(false);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const [classStartTime] = useState(new Date());
+  const [currentRoomId, setCurrentRoomId] = useState<string>('');
+  const [copiedRoomId, setCopiedRoomId] = useState(false);
+
+  // Generate unique room ID for faculty or load existing room for students
+  useEffect(() => {
+    if (userRole === 'faculty') {
+      // Faculty generates a new room ID
+      const roomId = `class-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      setCurrentRoomId(roomId);
+      // Store room ID for students to access
+      localStorage.setItem('activeClassRoom', roomId);
+      localStorage.setItem('activeClassName', className);
+      localStorage.setItem('activeClassTeacher', userName);
+    } else {
+      // Students load the active room ID
+      const activeRoom = localStorage.getItem('activeClassRoom');
+      if (activeRoom) {
+        setCurrentRoomId(activeRoom);
+      }
+    }
+  }, [userRole, className, userName]);
 
   const handleJoinClass = useCallback(() => {
     setIsInClass(true);
@@ -54,6 +77,13 @@ const LiveClassManager: React.FC<LiveClassManagerProps> = ({
     return duration > 0 ? `${duration} min` : '0 min';
   };
 
+  const copyRoomId = () => {
+    navigator.clipboard.writeText(currentRoomId);
+    setCopiedRoomId(true);
+    toast.success('Room ID copied to clipboard');
+    setTimeout(() => setCopiedRoomId(false), 2000);
+  };
+
   return (
     <div className="space-y-6">
       {/* Class Status Header */}
@@ -78,19 +108,55 @@ const LiveClassManager: React.FC<LiveClassManagerProps> = ({
             </div>
           </CardTitle>
         </CardHeader>
+        {currentRoomId && (
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <label className="text-xs text-muted-foreground mb-1 block">
+                  {userRole === 'faculty' ? 'Share this Room ID with students:' : 'Current Room ID:'}
+                </label>
+                <div className="flex gap-2">
+                  <Input 
+                    value={currentRoomId} 
+                    readOnly 
+                    className="font-mono text-sm"
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={copyRoomId}
+                  >
+                    {copiedRoomId ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Live Class Video */}
         <div className="lg:col-span-2">
-          <JitsiMeetStable
-            roomName={roomName}
-            displayName={userName}
-            userRole={userRole}
-            onJoinMeeting={handleJoinClass}
-            onLeaveMeeting={handleLeaveClass}
-            onVideoStreamReady={handleVideoStreamReady}
-          />
+          {currentRoomId ? (
+            <JitsiMeetStable
+              roomName={currentRoomId}
+              displayName={userName}
+              userRole={userRole}
+              onJoinMeeting={handleJoinClass}
+              onLeaveMeeting={handleLeaveClass}
+              onVideoStreamReady={handleVideoStreamReady}
+            />
+          ) : (
+            <Card>
+              <CardContent className="flex items-center justify-center h-[500px]">
+                <div className="text-center text-muted-foreground">
+                  <Video className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Waiting for teacher to start the class...</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Attention Tracking & Stats */}
