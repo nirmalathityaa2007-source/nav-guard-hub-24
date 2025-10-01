@@ -27,7 +27,8 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
   const [attentionScore, setAttentionScore] = useState(85);
   const [faceDetected, setFaceDetected] = useState(false);
   const [isLookingAtScreen, setIsLookingAtScreen] = useState(true);
-  const [facePositionHistory, setFacePositionHistory] = useState<{x: number, y: number, size: number}[]>([]);
+  const [facePositionHistory, setFacePositionHistory] = useState<{x: number, y: number, size: number, timestamp: number}[]>([]);
+  const [eyesClosedStart, setEyesClosedStart] = useState<number | null>(null);
   const animationRef = useRef<number>();
 
   useEffect(() => {
@@ -167,6 +168,11 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
           face.topLeft[0],
           face.topLeft[1] - 10
         );
+      } else {
+        // No face detected → Attention = 0
+        setAttentionScore(0);
+        onAttentionUpdate?.(0);
+        setIsLookingAtScreen(false);
       }
     } catch (error) {
       console.error('Error in face detection:', error);
@@ -181,6 +187,8 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
         return attentionScore;
       }
 
+      const now = Date.now();
+
       // Calculate face center and size
       const faceCenter = {
         x: (face.topLeft[0] + face.bottomRight[0]) / 2,
@@ -191,41 +199,74 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
       const faceHeight = face.bottomRight[1] - face.topLeft[1];
       const faceSize = Math.sqrt(faceWidth * faceWidth + faceHeight * faceHeight);
 
+      // Check for eyes closed (using probability from BlazeFace)
+      const probability = face.probability?.[0] || 1;
+      if (probability < 0.5) {
+        if (!eyesClosedStart) {
+          setEyesClosedStart(now);
+        } else if (now - eyesClosedStart > 5000) {
+          // Eyes closed for more than 5 seconds → Attention = 10
+          setIsLookingAtScreen(false);
+          return 10;
+        }
+      } else {
+        setEyesClosedStart(null);
+      }
+
       // Add to position history
       setFacePositionHistory(prev => {
-        const newHistory = [...prev, { x: faceCenter.x, y: faceCenter.y, size: faceSize }].slice(-30);
+        const newHistory = [...prev, { x: faceCenter.x, y: faceCenter.y, size: faceSize, timestamp: now }].slice(-60);
         return newHistory;
       });
 
-      let score = 100;
-
-      // Face size factor (distance from camera) - 30 points
-      const optimalSize = 150; // Optimal face size for attention
-      const sizeDiff = Math.abs(faceSize - optimalSize) / optimalSize;
-      if (sizeDiff > 0.5) { // Too far or too close
-        score -= 30;
-      } else if (sizeDiff > 0.3) {
-        score -= 15;
-      }
-
-      // Face position stability - 25 points
-      if (facePositionHistory.length > 5) {
-        const recentPositions = facePositionHistory.slice(-10);
-        const avgX = recentPositions.reduce((sum, pos) => sum + pos.x, 0) / recentPositions.length;
-        const avgY = recentPositions.reduce((sum, pos) => sum + pos.y, 0) / recentPositions.length;
+      // Check for head movements
+      if (facePositionHistory.length >= 20) {
+        const recentPositions = facePositionHistory.slice(-20);
         
-        const movement = Math.sqrt(
-          Math.pow(faceCenter.x - avgX, 2) + Math.pow(faceCenter.y - avgY, 2)
-        );
+        // Calculate horizontal movement (left-right shaking)
+        const xMovements = [];
+        for (let i = 1; i < recentPositions.length; i++) {
+          xMovements.push(recentPositions[i].x - recentPositions[i-1].x);
+        }
         
-        if (movement > 50) { // High movement - distracted
-          score -= 25;
-        } else if (movement > 25) { // Moderate movement
-          score -= 12;
+        // Calculate vertical movement (up-down nodding)
+        const yMovements = [];
+        for (let i = 1; i < recentPositions.length; i++) {
+          yMovements.push(recentPositions[i].y - recentPositions[i-1].y);
+        }
+        
+        const avgXMovement = Math.abs(xMovements.reduce((a, b) => a + b, 0) / xMovements.length);
+        const avgYMovement = Math.abs(yMovements.reduce((a, b) => a + b, 0) / yMovements.length);
+        
+        // Count direction changes for shaking detection
+        let xDirectionChanges = 0;
+        for (let i = 1; i < xMovements.length; i++) {
+          if ((xMovements[i] > 0) !== (xMovements[i-1] > 0)) {
+            xDirectionChanges++;
+          }
+        }
+        
+        let yDirectionChanges = 0;
+        for (let i = 1; i < yMovements.length; i++) {
+          if ((yMovements[i] > 0) !== (yMovements[i-1] > 0)) {
+            yDirectionChanges++;
+          }
+        }
+        
+        // Head shaking left and right → Attention = 50
+        if (xDirectionChanges >= 5 && avgXMovement > 3) {
+          setIsLookingAtScreen(false);
+          return 50;
+        }
+        
+        // Head moving down and up → Attention = 30
+        if (yDirectionChanges >= 5 && avgYMovement > 3) {
+          setIsLookingAtScreen(false);
+          return 30;
         }
       }
 
-      // Face centering - 25 points
+      // Check if face is straight and centered
       const videoWidth = videoRef.current?.videoWidth || 640;
       const videoHeight = videoRef.current?.videoHeight || 480;
       const centerX = videoWidth / 2;
@@ -238,30 +279,19 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
       const maxDistance = Math.sqrt(centerX * centerX + centerY * centerY);
       const centeringRatio = centerDistance / maxDistance;
       
-      if (centeringRatio > 0.4) { // Face too off-center
-        score -= 25;
-        setIsLookingAtScreen(false);
-      } else if (centeringRatio > 0.2) {
-        score -= 12;
-        setIsLookingAtScreen(true);
-      } else {
-        setIsLookingAtScreen(true);
-      }
-
-      // Face aspect ratio (head tilt) - 20 points
+      // Face aspect ratio check (not tilted)
       const aspectRatio = faceWidth / faceHeight;
-      if (aspectRatio < 0.6 || aspectRatio > 1.4) { // Head tilted too much
-        score -= 20;
-      } else if (aspectRatio < 0.7 || aspectRatio > 1.3) {
-        score -= 10;
+      const isStraight = aspectRatio >= 0.7 && aspectRatio <= 1.3;
+      
+      // Face is straight, centered, and visible → Attention = 100
+      if (centeringRatio <= 0.25 && isStraight && probability > 0.8) {
+        setIsLookingAtScreen(true);
+        return 100;
       }
 
-      // Add some randomness to simulate real attention tracking
-      const randomFactor = (Math.random() - 0.5) * 10;
-      score += randomFactor;
-
-      // Ensure score is within bounds
-      return Math.max(0, Math.min(100, Math.round(score)));
+      // Default: somewhat attentive but not perfect
+      setIsLookingAtScreen(centeringRatio <= 0.4);
+      return 70;
 
     } catch (error) {
       console.error('Error calculating attention score:', error);
@@ -305,16 +335,16 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
             autoPlay
             playsInline
             muted
-            className="w-full h-64 bg-background rounded-lg object-cover border"
+            className="w-full aspect-video bg-background rounded-lg object-cover border"
             style={{ display: isActive ? 'block' : 'none' }}
           />
           <canvas
             ref={canvasRef}
-            className="absolute top-0 left-0 w-full h-64 rounded-lg"
+            className="absolute top-0 left-0 w-full aspect-video rounded-lg"
             style={{ display: isActive ? 'block' : 'none' }}
           />
           {(!isActive || (isInLiveClass && !externalVideoStream)) && (
-            <div className="w-full h-64 bg-muted rounded-lg flex items-center justify-center border">
+            <div className="w-full aspect-video bg-muted rounded-lg flex items-center justify-center border">
               <div className="text-center text-gray-500">
                 <Camera className="h-8 w-8 mx-auto mb-2" />
                 <p>
