@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as tf from '@tensorflow/tfjs';
-import * as blazeface from '@tensorflow-models/blazeface';
+import * as faceLandmarksDetection from '@tensorflow-models/face-landmarks-detection';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -27,23 +27,30 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
   const [attentionScore, setAttentionScore] = useState(85);
   const [faceDetected, setFaceDetected] = useState(false);
   const [isLookingAtScreen, setIsLookingAtScreen] = useState(true);
-  const [facePositionHistory, setFacePositionHistory] = useState<{x: number, y: number, size: number, timestamp: number}[]>([]);
   const [eyesClosedStart, setEyesClosedStart] = useState<number | null>(null);
+  const [headShakeHistory, setHeadShakeHistory] = useState<{yaw: number, timestamp: number}[]>([]);
+  const [headNodHistory, setHeadNodHistory] = useState<{pitch: number, timestamp: number}[]>([]);
   const animationRef = useRef<number>();
 
   useEffect(() => {
     const loadModels = async () => {
       try {
-        console.log('Loading BlazeFace model...');
+        console.log('Loading MediaPipe FaceMesh model...');
         await tf.ready();
         
-        // Load BlazeFace model for face detection
-        const blazeFaceModel = await blazeface.load();
-        setFaceModel(blazeFaceModel);
+        // Load MediaPipe FaceMesh model for face landmarks detection
+        const detector = await faceLandmarksDetection.createDetector(
+          faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
+          { 
+            runtime: 'tfjs',
+            refineLandmarks: true
+          }
+        );
+        setFaceModel(detector);
         
-        console.log('BlazeFace model loaded successfully');
+        console.log('MediaPipe FaceMesh model loaded successfully');
       } catch (error) {
-        console.error('Error loading BlazeFace model:', error);
+        console.error('Error loading MediaPipe FaceMesh model:', error);
       }
     };
 
@@ -133,8 +140,8 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
     canvas.height = video.videoHeight;
 
     try {
-      // Detect faces with BlazeFace
-      const faces = await faceModel.estimateFaces(video, false);
+      // Detect faces with MediaPipe FaceMesh
+      const faces = await faceModel.estimateFaces(video);
       const detected = faces.length > 0;
       
       setFaceDetected(detected);
@@ -145,28 +152,29 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       if (detected && faces[0]) {
-        const face = faces[0];
-        const attention = calculateAttentionScore(face);
+        const attention = calculateAttentionScore(faces[0]);
         setAttentionScore(attention);
         onAttentionUpdate?.(attention);
 
-        // Draw face detection box
-        ctx.strokeStyle = attention > 60 ? '#22c55e' : '#ef4444';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(
-          face.topLeft[0],
-          face.topLeft[1],
-          face.bottomRight[0] - face.topLeft[0],
-          face.bottomRight[1] - face.topLeft[1]
-        );
+        // Draw face mesh points
+        const keypoints = faces[0].keypoints;
+        ctx.fillStyle = attention > 60 ? '#22c55e' : '#ef4444';
+        
+        // Draw key facial landmarks
+        [1, 159, 386, 234, 454].forEach(idx => {
+          if (keypoints[idx]) {
+            ctx.beginPath();
+            ctx.arc(keypoints[idx].x, keypoints[idx].y, 3, 0, 2 * Math.PI);
+            ctx.fill();
+          }
+        });
 
         // Draw attention score
-        ctx.fillStyle = attention > 60 ? '#22c55e' : '#ef4444';
         ctx.font = '16px sans-serif';
         ctx.fillText(
           `Attention: ${attention}%`,
-          face.topLeft[0],
-          face.topLeft[1] - 10
+          20,
+          30
         );
       } else {
         // No face detected → Attention = 0
@@ -183,35 +191,23 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
 
   const calculateAttentionScore = (face: any): number => {
     try {
-      if (!face.topLeft || !face.bottomRight) {
+      if (!face.keypoints || face.keypoints.length === 0) {
         return 0;
       }
 
       const now = Date.now();
+      const keypoints = face.keypoints;
 
-      // Calculate face center and size
-      const faceCenter = {
-        x: (face.topLeft[0] + face.bottomRight[0]) / 2,
-        y: (face.topLeft[1] + face.bottomRight[1]) / 2
-      };
-      
-      const faceWidth = face.bottomRight[0] - face.topLeft[0];
-      const faceHeight = face.bottomRight[1] - face.topLeft[1];
-      const faceSize = Math.sqrt(faceWidth * faceWidth + faceHeight * faceHeight);
+      // Calculate Eye Aspect Ratio (EAR) for both eyes
+      const leftEyeHeight = Math.abs(keypoints[159].y - keypoints[145].y);
+      const rightEyeHeight = Math.abs(keypoints[386].y - keypoints[374].y);
+      const avgEyeOpen = (leftEyeHeight + rightEyeHeight) / 2;
 
-      // Add to position history
-      setFacePositionHistory(prev => {
-        const newHistory = [...prev, { x: faceCenter.x, y: faceCenter.y, size: faceSize, timestamp: now }].slice(-60);
-        return newHistory;
-      });
-
-      // 1. Check for eyes closed (using face size as proxy - smaller face = possibly eyes closed or looking away)
-      const probability = face.probability?.[0] || 1;
-      if (probability < 0.7) {
+      // 1. Check for eyes closed for more than 5 seconds → Attention = 10
+      if (avgEyeOpen < 0.01) {
         if (!eyesClosedStart) {
           setEyesClosedStart(now);
         } else if (now - eyesClosedStart > 5000) {
-          // Eyes closed for more than 5 seconds → Attention = 10
           setIsLookingAtScreen(false);
           return 10;
         }
@@ -219,79 +215,69 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
         setEyesClosedStart(null);
       }
 
-      // 2. Check for head movements (need sufficient history)
-      if (facePositionHistory.length >= 30) {
-        const recentPositions = facePositionHistory.slice(-30);
+      // Calculate head pose (yaw and pitch)
+      const nose = keypoints[1]; // Nose tip
+      const leftEar = keypoints[234];
+      const rightEar = keypoints[454];
+      
+      // Yaw (left-right rotation)
+      const yaw = rightEar.x - leftEar.x;
+      
+      // Pitch (up-down rotation)
+      const pitch = nose.y - ((leftEar.y + rightEar.y) / 2);
+
+      // Track yaw for head shaking detection
+      setHeadShakeHistory(prev => {
+        const newHistory = [...prev, { yaw, timestamp: now }].slice(-30);
+        return newHistory;
+      });
+
+      // Track pitch for head nodding detection
+      setHeadNodHistory(prev => {
+        const newHistory = [...prev, { pitch, timestamp: now }].slice(-30);
+        return newHistory;
+      });
+
+      // 2. Check for head shaking left and right → Attention = 50
+      if (headShakeHistory.length >= 20) {
+        const yawChanges = headShakeHistory.slice(-20);
+        let directionChanges = 0;
         
-        // Calculate horizontal movement (left-right shaking)
-        const xMovements = [];
-        for (let i = 1; i < recentPositions.length; i++) {
-          xMovements.push(recentPositions[i].x - recentPositions[i-1].x);
-        }
-        
-        // Calculate vertical movement (up-down nodding)
-        const yMovements = [];
-        for (let i = 1; i < recentPositions.length; i++) {
-          yMovements.push(recentPositions[i].y - recentPositions[i-1].y);
-        }
-        
-        // Count direction changes for movement detection
-        let xDirectionChanges = 0;
-        let xTotalMovement = 0;
-        for (let i = 1; i < xMovements.length; i++) {
-          if (Math.abs(xMovements[i]) > 2) { // Only count significant movements
-            xTotalMovement += Math.abs(xMovements[i]);
-            if ((xMovements[i] > 0) !== (xMovements[i-1] > 0)) {
-              xDirectionChanges++;
-            }
+        for (let i = 1; i < yawChanges.length; i++) {
+          const prev = yawChanges[i-1].yaw;
+          const curr = yawChanges[i].yaw;
+          if ((curr > 0) !== (prev > 0)) {
+            directionChanges++;
           }
         }
         
-        let yDirectionChanges = 0;
-        let yTotalMovement = 0;
-        for (let i = 1; i < yMovements.length; i++) {
-          if (Math.abs(yMovements[i]) > 2) { // Only count significant movements
-            yTotalMovement += Math.abs(yMovements[i]);
-            if ((yMovements[i] > 0) !== (yMovements[i-1] > 0)) {
-              yDirectionChanges++;
-            }
-          }
-        }
-        
-        // Head shaking left and right → Attention = 50
-        // Must have multiple direction changes AND significant total movement
-        if (xDirectionChanges >= 4 && xTotalMovement > 50) {
+        if (directionChanges >= 4 && Math.abs(yaw) > 60) {
           setIsLookingAtScreen(false);
           return 50;
         }
+      }
+
+      // 3. Check for head nodding up and down → Attention = 30
+      if (headNodHistory.length >= 20) {
+        const pitchChanges = headNodHistory.slice(-20);
+        let directionChanges = 0;
         
-        // Head moving down and up → Attention = 30
-        // Must have multiple direction changes AND significant total movement
-        if (yDirectionChanges >= 4 && yTotalMovement > 50) {
+        for (let i = 1; i < pitchChanges.length; i++) {
+          const prev = pitchChanges[i-1].pitch;
+          const curr = pitchChanges[i].pitch;
+          if ((curr > 0) !== (prev > 0)) {
+            directionChanges++;
+          }
+        }
+        
+        if (directionChanges >= 4 && Math.abs(pitch) > 20) {
           setIsLookingAtScreen(false);
           return 30;
         }
       }
 
-      // 3. Check if face is straight, centered, and visible → Attention = 100
-      const videoWidth = videoRef.current?.videoWidth || 640;
-      const videoHeight = videoRef.current?.videoHeight || 480;
-      const centerX = videoWidth / 2;
-      const centerY = videoHeight / 2;
-      
-      const centerDistance = Math.sqrt(
-        Math.pow(faceCenter.x - centerX, 2) + Math.pow(faceCenter.y - centerY, 2)
-      );
-      
-      const maxDistance = Math.sqrt(centerX * centerX + centerY * centerY);
-      const centeringRatio = centerDistance / maxDistance;
-      
-      // Face aspect ratio check (not tilted)
-      const aspectRatio = faceWidth / faceHeight;
-      const isStraight = aspectRatio >= 0.75 && aspectRatio <= 1.25;
-      
-      // Face is straight, centered, and clearly visible → Attention = 100
-      if (centeringRatio <= 0.3 && isStraight && probability > 0.75) {
+      // 4. Face is straight and visible → Attention = 100
+      if (Math.abs(yaw) < 60 && Math.abs(pitch) < 20 && avgEyeOpen >= 0.01) {
         setIsLookingAtScreen(true);
         return 100;
       }
