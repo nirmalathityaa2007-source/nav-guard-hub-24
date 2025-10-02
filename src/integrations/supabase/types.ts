@@ -14,7 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      attention_logs: {
+        Row: {
+          attention_score: number
+          id: string
+          student_id: string
+          timestamp: string
+        }
+        Insert: {
+          attention_score: number
+          id?: string
+          student_id: string
+          timestamp?: string
+        }
+        Update: {
+          attention_score?: number
+          id?: string
+          student_id?: string
+          timestamp?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

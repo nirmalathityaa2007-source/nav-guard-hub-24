@@ -4,7 +4,9 @@ import * as faceLandmarksDetection from '@tensorflow-models/face-landmarks-detec
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Camera, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Eye, Camera, AlertTriangle, CheckCircle2, User } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AttentionTrackerProps {
   isActive: boolean;
@@ -12,6 +14,9 @@ interface AttentionTrackerProps {
   externalVideoStream?: MediaStream | null;
   onAttentionUpdate?: (score: number) => void;
   onFaceDetected?: (detected: boolean) => void;
+  studentId?: string;
+  studentName?: string;
+  studentAvatar?: string;
 }
 
 const AttentionTracker: React.FC<AttentionTrackerProps> = ({
@@ -19,7 +24,10 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
   isInLiveClass = false,
   externalVideoStream = null,
   onAttentionUpdate,
-  onFaceDetected
+  onFaceDetected,
+  studentId = 'demo-student',
+  studentName = 'Student',
+  studentAvatar
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -30,7 +38,9 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
   const [eyesClosedStart, setEyesClosedStart] = useState<number | null>(null);
   const [headShakeHistory, setHeadShakeHistory] = useState<{yaw: number, timestamp: number}[]>([]);
   const [headNodHistory, setHeadNodHistory] = useState<{pitch: number, timestamp: number}[]>([]);
+  const [lastDetectionData, setLastDetectionData] = useState<any>(null);
   const animationRef = useRef<number>();
+  const captureIntervalRef = useRef<number>();
 
   useEffect(() => {
     const loadModels = async () => {
@@ -60,14 +70,17 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
   useEffect(() => {
     if (isActive && faceModel) {
       if (externalVideoStream) {
-        // Use external video stream from Jitsi
         useExternalStream();
       } else if (!isInLiveClass) {
-        // Only start own camera if not in live class and no external stream
         startCamera();
       } else {
         stopCamera();
       }
+      
+      // Start frame capture interval (every 2.5 seconds)
+      captureIntervalRef.current = window.setInterval(() => {
+        captureAndAnalyzeFrame();
+      }, 2500);
     } else {
       stopCamera();
     }
@@ -75,6 +88,9 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
+      }
+      if (captureIntervalRef.current) {
+        clearInterval(captureIntervalRef.current);
       }
     };
   }, [isActive, faceModel, isInLiveClass, externalVideoStream]);
@@ -112,13 +128,51 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
 
   const stopCamera = () => {
     if (videoRef.current?.srcObject && !externalVideoStream) {
-      // Only stop if it's our own camera stream, not external
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
       videoRef.current.srcObject = null;
     }
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
+    }
+    if (captureIntervalRef.current) {
+      clearInterval(captureIntervalRef.current);
+    }
+  };
+
+  const captureAndAnalyzeFrame = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx || video.videoWidth === 0) return;
+
+    // Capture frame
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    
+    const frameData = canvas.toDataURL('image/jpeg', 0.8);
+
+    try {
+      // Send to backend for analysis
+      const response = await supabase.functions.invoke('analyze-attention', {
+        body: {
+          studentId,
+          frameData,
+          detectionData: lastDetectionData
+        }
+      });
+
+      if (response.data?.attention_score !== undefined) {
+        const score = response.data.attention_score;
+        setAttentionScore(score);
+        onAttentionUpdate?.(score);
+      }
+    } catch (error) {
+      console.error('Error analyzing frame:', error);
     }
   };
 
@@ -152,13 +206,17 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       if (detected && faces[0]) {
-        const attention = calculateAttentionScore(faces[0]);
-        setAttentionScore(attention);
-        onAttentionUpdate?.(attention);
+        const detectionData = calculateDetectionData(faces[0]);
+        setLastDetectionData(detectionData);
+        
+        // Update local score for immediate feedback
+        const localScore = calculateLocalAttentionScore(detectionData);
+        setAttentionScore(localScore);
+        onAttentionUpdate?.(localScore);
 
         // Draw face mesh points
         const keypoints = faces[0].keypoints;
-        ctx.fillStyle = attention > 60 ? '#22c55e' : '#ef4444';
+        ctx.fillStyle = localScore > 60 ? '#22c55e' : '#ef4444';
         
         // Draw key facial landmarks
         [1, 159, 386, 234, 454].forEach(idx => {
@@ -172,12 +230,12 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
         // Draw attention score
         ctx.font = '16px sans-serif';
         ctx.fillText(
-          `Attention: ${attention}%`,
+          `Attention: ${localScore}%`,
           20,
           30
         );
       } else {
-        // No face detected → Attention = 0
+        setLastDetectionData({ faceDetected: false });
         setAttentionScore(0);
         onAttentionUpdate?.(0);
         setIsLookingAtScreen(false);
@@ -189,158 +247,112 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
     animationRef.current = requestAnimationFrame(detectFaces);
   };
 
-  const calculateAttentionScore = (face: any): number => {
-    try {
-      if (!face.keypoints || face.keypoints.length === 0) {
-        return 0;
-      }
-
-      const now = Date.now();
-      const keypoints = face.keypoints;
-
-      // Calculate Eye Aspect Ratio (EAR) for both eyes
-      const leftEyeHeight = Math.abs(keypoints[159].y - keypoints[145].y);
-      const rightEyeHeight = Math.abs(keypoints[386].y - keypoints[374].y);
-      const avgEyeOpen = (leftEyeHeight + rightEyeHeight) / 2;
-
-      // 1. Check for eyes closed for more than 5 seconds → Attention = 10
-      if (avgEyeOpen < 0.01) {
-        if (!eyesClosedStart) {
-          setEyesClosedStart(now);
-        } else if (now - eyesClosedStart > 5000) {
-          setIsLookingAtScreen(false);
-          return 10;
-        }
-      } else {
-        setEyesClosedStart(null);
-      }
-
-      // Calculate head pose (yaw and pitch)
-      const nose = keypoints[1]; // Nose tip
-      const leftEar = keypoints[234];
-      const rightEar = keypoints[454];
-      
-      // Yaw (left-right rotation)
-      const yaw = rightEar.x - leftEar.x;
-      
-      // Pitch (up-down rotation)
-      const pitch = nose.y - ((leftEar.y + rightEar.y) / 2);
-
-      // Track yaw for head shaking detection
-      setHeadShakeHistory(prev => {
-        const newHistory = [...prev, { yaw, timestamp: now }].slice(-30);
-        return newHistory;
-      });
-
-      // Track pitch for head nodding detection
-      setHeadNodHistory(prev => {
-        const newHistory = [...prev, { pitch, timestamp: now }].slice(-30);
-        return newHistory;
-      });
-
-      // 2. Check for head shaking left and right → Attention = 50
-      if (headShakeHistory.length >= 20) {
-        const yawChanges = headShakeHistory.slice(-20);
-        let directionChanges = 0;
-        
-        for (let i = 1; i < yawChanges.length; i++) {
-          const prev = yawChanges[i-1].yaw;
-          const curr = yawChanges[i].yaw;
-          if ((curr > 0) !== (prev > 0)) {
-            directionChanges++;
-          }
-        }
-        
-        if (directionChanges >= 4 && Math.abs(yaw) > 60) {
-          setIsLookingAtScreen(false);
-          return 50;
-        }
-      }
-
-      // 3. Check for head nodding up and down → Attention = 30
-      if (headNodHistory.length >= 20) {
-        const pitchChanges = headNodHistory.slice(-20);
-        let directionChanges = 0;
-        
-        for (let i = 1; i < pitchChanges.length; i++) {
-          const prev = pitchChanges[i-1].pitch;
-          const curr = pitchChanges[i].pitch;
-          if ((curr > 0) !== (prev > 0)) {
-            directionChanges++;
-          }
-        }
-        
-        if (directionChanges >= 4 && Math.abs(pitch) > 20) {
-          setIsLookingAtScreen(false);
-          return 30;
-        }
-      }
-
-      // 4. Face is straight and visible → Attention = 100
-      if (Math.abs(yaw) < 60 && Math.abs(pitch) < 20 && avgEyeOpen >= 0.01) {
-        setIsLookingAtScreen(true);
-        return 100;
-      }
-
-      // Default: face detected but not perfectly attentive
-      setIsLookingAtScreen(false);
-      return 70;
-
-    } catch (error) {
-      console.error('Error calculating attention score:', error);
-      return 0;
+  const calculateDetectionData = (face: any) => {
+    if (!face.keypoints || face.keypoints.length === 0) {
+      return { faceDetected: false };
     }
+
+    const keypoints = face.keypoints;
+    const leftEyeHeight = Math.abs(keypoints[159].y - keypoints[145].y);
+    const rightEyeHeight = Math.abs(keypoints[386].y - keypoints[374].y);
+    const avgEyeOpen = (leftEyeHeight + rightEyeHeight) / 2;
+
+    const nose = keypoints[1];
+    const leftEar = keypoints[234];
+    const rightEar = keypoints[454];
+    const yaw = rightEar.x - leftEar.x;
+    const pitch = nose.y - ((leftEar.y + rightEar.y) / 2);
+
+    const eyesOpen = avgEyeOpen >= 0.01;
+    const lookingAtScreen = Math.abs(yaw) < 60 && Math.abs(pitch) < 20;
+
+    return {
+      faceDetected: true,
+      eyesOpen,
+      yaw,
+      pitch,
+      lookingAtScreen
+    };
+  };
+
+  const calculateLocalAttentionScore = (detectionData: any): number => {
+    if (!detectionData.faceDetected) return 0;
+    if (!detectionData.eyesOpen) return 0;
+    if (detectionData.lookingAtScreen) return 100;
+    if (Math.abs(detectionData.yaw) > 45 || Math.abs(detectionData.pitch) > 30) return 50;
+    return 70;
   };
 
 
-  const getAttentionLevel = (score: number) => {
-    if (score >= 80) return { level: 'Excellent', color: 'text-green-600', bgColor: 'bg-green-100' };
-    if (score >= 60) return { level: 'Good', color: 'text-yellow-600', bgColor: 'bg-yellow-100' };
-    if (score >= 40) return { level: 'Fair', color: 'text-orange-600', bgColor: 'bg-orange-100' };
-    return { level: 'Poor', color: 'text-red-600', bgColor: 'bg-red-100' };
+  const getAttentionColor = (score: number) => {
+    if (score >= 80) return 'bg-green-500';
+    if (score >= 50) return 'bg-yellow-500';
+    return 'bg-red-500';
   };
 
-  const attentionLevel = getAttentionLevel(attentionScore);
+  const getAttentionStatus = (score: number) => {
+    if (score >= 80) return 'Excellent';
+    if (score >= 50) return 'Moderate';
+    return 'Poor';
+  };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Eye className="h-5 w-5" />
-          Attention Tracking
-          {faceDetected ? (
-            <Badge className="bg-green-500 hover:bg-green-600">
-              <CheckCircle2 className="w-3 h-3 mr-1" />
-              Active
-            </Badge>
-          ) : (
-            <Badge variant="outline">
-              <AlertTriangle className="w-3 h-3 mr-1" />
-              No Face
-            </Badge>
-          )}
-        </CardTitle>
+    <Card className="shadow-lg rounded-xl overflow-hidden">
+      <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-12 w-12 border-2 border-primary/20">
+              {studentAvatar ? (
+                <AvatarImage src={studentAvatar} alt={studentName} />
+              ) : (
+                <AvatarFallback className="bg-primary/10">
+                  <User className="h-6 w-6 text-primary" />
+                </AvatarFallback>
+              )}
+            </Avatar>
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                {studentName}
+                {faceDetected ? (
+                  <Badge className="bg-green-500 hover:bg-green-600">
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    Active
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="border-red-300 text-red-600">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    No Face
+                  </Badge>
+                )}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">Real-time Attention Monitoring</p>
+            </div>
+          </div>
+          <Eye className="h-6 w-6 text-primary" />
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="relative">
+      
+      <CardContent className="space-y-6 pt-6">
+        {/* Video Preview */}
+        <div className="relative rounded-xl overflow-hidden shadow-md">
           <video
             ref={videoRef}
             autoPlay
             playsInline
             muted
-            className="w-full aspect-video bg-background rounded-lg object-cover border"
+            className="w-full aspect-video bg-background object-cover"
             style={{ display: isActive ? 'block' : 'none' }}
           />
           <canvas
             ref={canvasRef}
-            className="absolute top-0 left-0 w-full aspect-video rounded-lg"
+            className="absolute top-0 left-0 w-full aspect-video"
             style={{ display: isActive ? 'block' : 'none' }}
           />
           {(!isActive || (isInLiveClass && !externalVideoStream)) && (
-            <div className="w-full aspect-video bg-muted rounded-lg flex items-center justify-center border">
-              <div className="text-center text-gray-500">
-                <Camera className="h-8 w-8 mx-auto mb-2" />
-                <p>
+            <div className="w-full aspect-video bg-gradient-to-br from-muted to-muted/50 rounded-xl flex items-center justify-center">
+              <div className="text-center">
+                <Camera className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
+                <p className="text-muted-foreground font-medium">
                   {isInLiveClass && !externalVideoStream
                     ? "Waiting for live class video stream..." 
                     : "Attention tracking inactive"
@@ -351,33 +363,59 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
           )}
         </div>
 
-        <div className="space-y-3">
+        {/* Attention Score Display */}
+        <div className="bg-gradient-to-br from-background to-muted/20 rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Attention Score</span>
-            <span className={`text-lg font-bold ${attentionLevel.color}`}>
-              {attentionScore}%
+            <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Attention Score
             </span>
+            <div className="flex items-center gap-2">
+              <span className={`text-3xl font-bold ${
+                attentionScore >= 80 ? 'text-green-600' : 
+                attentionScore >= 50 ? 'text-yellow-600' : 
+                'text-red-600'
+              }`}>
+                {attentionScore}%
+              </span>
+              <Badge variant="outline" className="font-semibold">
+                {getAttentionStatus(attentionScore)}
+              </Badge>
+            </div>
           </div>
-          <Progress value={attentionScore} className="h-3" />
-          <div className={`text-center p-2 rounded-lg ${attentionLevel.bgColor}`}>
-            <span className={`text-sm font-medium ${attentionLevel.color}`}>
-              {attentionLevel.level} Attention
-            </span>
+          
+          <div className="relative h-4 bg-muted rounded-full overflow-hidden">
+            <div 
+              className={`h-full transition-all duration-500 ${getAttentionColor(attentionScore)}`}
+              style={{ width: `${attentionScore}%` }}
+            />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div className="flex items-center justify-between p-2 border rounded">
-            <span>Face Detected:</span>
-            <Badge variant={faceDetected ? "default" : "outline"}>
-              {faceDetected ? "Yes" : "No"}
-            </Badge>
+        {/* Status Indicators */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className={`p-3 rounded-lg border-2 transition-colors ${
+            faceDetected 
+              ? 'border-green-200 bg-green-50' 
+              : 'border-red-200 bg-red-50'
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Face Detected</span>
+              <Badge variant={faceDetected ? "default" : "destructive"} className="font-semibold">
+                {faceDetected ? "Yes" : "No"}
+              </Badge>
+            </div>
           </div>
-          <div className="flex items-center justify-between p-2 border rounded">
-            <span>Looking at Screen:</span>
-            <Badge variant={isLookingAtScreen ? "default" : "secondary"}>
-              {isLookingAtScreen ? "Yes" : "No"}
-            </Badge>
+          <div className={`p-3 rounded-lg border-2 transition-colors ${
+            isLookingAtScreen 
+              ? 'border-blue-200 bg-blue-50' 
+              : 'border-orange-200 bg-orange-50'
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">On Screen</span>
+              <Badge variant={isLookingAtScreen ? "default" : "secondary"} className="font-semibold">
+                {isLookingAtScreen ? "Yes" : "No"}
+              </Badge>
+            </div>
           </div>
         </div>
       </CardContent>
