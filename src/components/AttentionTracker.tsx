@@ -19,6 +19,18 @@ interface AttentionTrackerProps {
   studentAvatar?: string;
 }
 
+// Advanced attention detection metrics
+interface AttentionMetrics {
+  faceDetected: boolean;
+  eyeAspectRatio: { left: number; right: number };
+  gazeDirection: { horizontal: number; vertical: number };
+  headPose: { yaw: number; pitch: number; roll: number };
+  blinkRate: number;
+  movementStability: number;
+  eyesOpenDuration: number;
+  lookingAtScreenConfidence: number;
+}
+
 const AttentionTracker: React.FC<AttentionTrackerProps> = ({
   isActive,
   isInLiveClass = false,
@@ -35,12 +47,17 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
   const [attentionScore, setAttentionScore] = useState(85);
   const [faceDetected, setFaceDetected] = useState(false);
   const [isLookingAtScreen, setIsLookingAtScreen] = useState(true);
-  const [eyesClosedStart, setEyesClosedStart] = useState<number | null>(null);
-  const [headShakeHistory, setHeadShakeHistory] = useState<{yaw: number, timestamp: number}[]>([]);
-  const [headNodHistory, setHeadNodHistory] = useState<{pitch: number, timestamp: number}[]>([]);
-  const [lastDetectionData, setLastDetectionData] = useState<any>(null);
+  const [lastDetectionData, setLastDetectionData] = useState<AttentionMetrics | null>(null);
   const animationRef = useRef<number>();
   const captureIntervalRef = useRef<number>();
+  
+  // Advanced tracking state
+  const blinkHistoryRef = useRef<number[]>([]);
+  const headPoseHistoryRef = useRef<{yaw: number; pitch: number; timestamp: number}[]>([]);
+  const gazeHistoryRef = useRef<{h: number; v: number; timestamp: number}[]>([]);
+  const eyesOpenTimeRef = useRef<number>(Date.now());
+  const lastBlinkTimeRef = useRef<number>(Date.now());
+  const attentionHistoryRef = useRef<number[]>([]);
 
   useEffect(() => {
     const loadModels = async () => {
@@ -77,10 +94,10 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
         stopCamera();
       }
       
-      // Start frame capture interval (every 2.5 seconds)
+      // Start frame capture interval (every 2 seconds for more responsive tracking)
       captureIntervalRef.current = window.setInterval(() => {
         captureAndAnalyzeFrame();
-      }, 2500);
+      }, 2000);
     } else {
       stopCamera();
     }
@@ -208,6 +225,7 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
       if (detected && faces[0]) {
         const detectionData = calculateDetectionData(faces[0]);
         setLastDetectionData(detectionData);
+        setIsLookingAtScreen(detectionData.lookingAtScreenConfidence > 0.6);
         
         // Update local score for immediate feedback
         const localScore = calculateLocalAttentionScore(detectionData);
@@ -235,7 +253,17 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
           30
         );
       } else {
-        setLastDetectionData({ faceDetected: false });
+        const emptyMetrics: AttentionMetrics = {
+          faceDetected: false,
+          eyeAspectRatio: { left: 0, right: 0 },
+          gazeDirection: { horizontal: 0, vertical: 0 },
+          headPose: { yaw: 0, pitch: 0, roll: 0 },
+          blinkRate: 0,
+          movementStability: 0,
+          eyesOpenDuration: 0,
+          lookingAtScreenConfidence: 0
+        };
+        setLastDetectionData(emptyMetrics);
         setAttentionScore(0);
         onAttentionUpdate?.(0);
         setIsLookingAtScreen(false);
@@ -247,40 +275,201 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
     animationRef.current = requestAnimationFrame(detectFaces);
   };
 
-  const calculateDetectionData = (face: any) => {
+  const calculateEyeAspectRatio = (eyePoints: any[], keypoints: any[]) => {
+    // Calculate Eye Aspect Ratio (EAR) for blink detection
+    // EAR = (||p2-p6|| + ||p3-p5||) / (2 * ||p1-p4||)
+    const p1 = keypoints[eyePoints[0]];
+    const p2 = keypoints[eyePoints[1]];
+    const p3 = keypoints[eyePoints[2]];
+    const p4 = keypoints[eyePoints[3]];
+    const p5 = keypoints[eyePoints[4]];
+    const p6 = keypoints[eyePoints[5]];
+    
+    const vertical1 = Math.hypot(p2.x - p6.x, p2.y - p6.y);
+    const vertical2 = Math.hypot(p3.x - p5.x, p3.y - p5.y);
+    const horizontal = Math.hypot(p1.x - p4.x, p1.y - p4.y);
+    
+    return (vertical1 + vertical2) / (2.0 * horizontal);
+  };
+
+  const calculateGazeDirection = (eyeCenter: any, iris: any) => {
+    // Calculate gaze direction based on iris position relative to eye center
+    const dx = iris.x - eyeCenter.x;
+    const dy = iris.y - eyeCenter.y;
+    return { horizontal: dx, vertical: dy };
+  };
+
+  const calculateHeadPose = (keypoints: any[]) => {
+    // Advanced head pose estimation using facial landmarks
+    const nose = keypoints[1];
+    const leftEye = keypoints[33];
+    const rightEye = keypoints[263];
+    const leftMouth = keypoints[61];
+    const rightMouth = keypoints[291];
+    const chin = keypoints[199];
+    const forehead = keypoints[10];
+    
+    // Yaw (left-right rotation)
+    const faceWidth = Math.hypot(rightEye.x - leftEye.x, rightEye.y - leftEye.y);
+    const noseOffset = nose.x - (leftEye.x + rightEye.x) / 2;
+    const yaw = (noseOffset / faceWidth) * 90;
+    
+    // Pitch (up-down rotation)
+    const faceHeight = Math.hypot(forehead.x - chin.x, forehead.y - chin.y);
+    const noseVerticalOffset = nose.y - forehead.y;
+    const pitch = ((noseVerticalOffset / faceHeight) - 0.5) * 60;
+    
+    // Roll (tilt)
+    const eyeAngle = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x);
+    const roll = eyeAngle * (180 / Math.PI);
+    
+    return { yaw, pitch, roll };
+  };
+
+  const calculateMovementStability = () => {
+    // Analyze recent head pose history for stability
+    const recentPoses = headPoseHistoryRef.current.slice(-10);
+    if (recentPoses.length < 5) return 1.0;
+    
+    const yawVariance = recentPoses.reduce((sum, pose, i) => {
+      if (i === 0) return 0;
+      return sum + Math.abs(pose.yaw - recentPoses[i-1].yaw);
+    }, 0) / recentPoses.length;
+    
+    const pitchVariance = recentPoses.reduce((sum, pose, i) => {
+      if (i === 0) return 0;
+      return sum + Math.abs(pose.pitch - recentPoses[i-1].pitch);
+    }, 0) / recentPoses.length;
+    
+    const totalVariance = yawVariance + pitchVariance;
+    return Math.max(0, 1 - (totalVariance / 30));
+  };
+
+  const calculateBlinkRate = () => {
+    const now = Date.now();
+    const recentBlinks = blinkHistoryRef.current.filter(time => now - time < 60000);
+    return recentBlinks.length; // blinks per minute
+  };
+
+  const calculateDetectionData = (face: any): AttentionMetrics => {
     if (!face.keypoints || face.keypoints.length === 0) {
-      return { faceDetected: false };
+      return {
+        faceDetected: false,
+        eyeAspectRatio: { left: 0, right: 0 },
+        gazeDirection: { horizontal: 0, vertical: 0 },
+        headPose: { yaw: 0, pitch: 0, roll: 0 },
+        blinkRate: 0,
+        movementStability: 0,
+        eyesOpenDuration: 0,
+        lookingAtScreenConfidence: 0
+      };
     }
 
     const keypoints = face.keypoints;
-    const leftEyeHeight = Math.abs(keypoints[159].y - keypoints[145].y);
-    const rightEyeHeight = Math.abs(keypoints[386].y - keypoints[374].y);
-    const avgEyeOpen = (leftEyeHeight + rightEyeHeight) / 2;
-
-    const nose = keypoints[1];
-    const leftEar = keypoints[234];
-    const rightEar = keypoints[454];
-    const yaw = rightEar.x - leftEar.x;
-    const pitch = nose.y - ((leftEar.y + rightEar.y) / 2);
-
-    const eyesOpen = avgEyeOpen >= 0.01;
-    const lookingAtScreen = Math.abs(yaw) < 60 && Math.abs(pitch) < 20;
-
+    const now = Date.now();
+    
+    // Calculate Eye Aspect Ratios
+    const leftEyePoints = [33, 160, 158, 133, 153, 144]; // Left eye landmarks
+    const rightEyePoints = [362, 385, 387, 263, 373, 380]; // Right eye landmarks
+    const leftEAR = calculateEyeAspectRatio(leftEyePoints, keypoints);
+    const rightEAR = calculateEyeAspectRatio(rightEyePoints, keypoints);
+    
+    // Blink detection (EAR < 0.2 indicates closed eyes)
+    const eyesOpen = leftEAR > 0.2 && rightEAR > 0.2;
+    if (!eyesOpen && now - lastBlinkTimeRef.current > 200) {
+      blinkHistoryRef.current.push(now);
+      lastBlinkTimeRef.current = now;
+      eyesOpenTimeRef.current = now;
+    }
+    
+    const eyesOpenDuration = eyesOpen ? (now - eyesOpenTimeRef.current) / 1000 : 0;
+    
+    // Calculate gaze direction using iris and eye center
+    const leftEyeCenter = keypoints[468];
+    const rightEyeCenter = keypoints[473];
+    const leftIris = keypoints[468];
+    const rightIris = keypoints[473];
+    const leftGaze = calculateGazeDirection(leftEyeCenter, leftIris);
+    const rightGaze = calculateGazeDirection(rightEyeCenter, rightIris);
+    const avgGaze = {
+      horizontal: (leftGaze.horizontal + rightGaze.horizontal) / 2,
+      vertical: (leftGaze.vertical + rightGaze.vertical) / 2
+    };
+    
+    // Store gaze history
+    gazeHistoryRef.current.push({ h: avgGaze.horizontal, v: avgGaze.vertical, timestamp: now });
+    if (gazeHistoryRef.current.length > 30) gazeHistoryRef.current.shift();
+    
+    // Calculate head pose
+    const headPose = calculateHeadPose(keypoints);
+    headPoseHistoryRef.current.push({ yaw: headPose.yaw, pitch: headPose.pitch, timestamp: now });
+    if (headPoseHistoryRef.current.length > 20) headPoseHistoryRef.current.shift();
+    
+    // Calculate movement stability
+    const movementStability = calculateMovementStability();
+    
+    // Calculate blink rate
+    const blinkRate = calculateBlinkRate();
+    
+    // Calculate looking at screen confidence
+    const headForward = Math.abs(headPose.yaw) < 15 && Math.abs(headPose.pitch) < 15;
+    const gazeForward = Math.abs(avgGaze.horizontal) < 2 && Math.abs(avgGaze.vertical) < 2;
+    const stableHead = movementStability > 0.7;
+    
+    let lookingAtScreenConfidence = 0;
+    if (headForward) lookingAtScreenConfidence += 0.4;
+    if (gazeForward) lookingAtScreenConfidence += 0.4;
+    if (stableHead) lookingAtScreenConfidence += 0.2;
+    
     return {
       faceDetected: true,
-      eyesOpen,
-      yaw,
-      pitch,
-      lookingAtScreen
+      eyeAspectRatio: { left: leftEAR, right: rightEAR },
+      gazeDirection: avgGaze,
+      headPose,
+      blinkRate,
+      movementStability,
+      eyesOpenDuration,
+      lookingAtScreenConfidence
     };
   };
 
-  const calculateLocalAttentionScore = (detectionData: any): number => {
-    if (!detectionData.faceDetected) return 0;
-    if (!detectionData.eyesOpen) return 0;
-    if (detectionData.lookingAtScreen) return 100;
-    if (Math.abs(detectionData.yaw) > 45 || Math.abs(detectionData.pitch) > 30) return 50;
-    return 70;
+  const calculateLocalAttentionScore = (metrics: AttentionMetrics): number => {
+    if (!metrics.faceDetected) return 0;
+    
+    const { eyeAspectRatio, headPose, blinkRate, movementStability, eyesOpenDuration, lookingAtScreenConfidence } = metrics;
+    
+    // Eyes closed = 0 attention
+    if (eyeAspectRatio.left < 0.2 && eyeAspectRatio.right < 0.2) return 0;
+    
+    // Multiple weighted factors for accurate scoring
+    let score = 0;
+    
+    // Looking at screen confidence (40% weight)
+    score += lookingAtScreenConfidence * 40;
+    
+    // Head pose (20% weight)
+    const headPoseScore = Math.max(0, 1 - (Math.abs(headPose.yaw) / 45) - (Math.abs(headPose.pitch) / 30));
+    score += headPoseScore * 20;
+    
+    // Movement stability (15% weight)
+    score += movementStability * 15;
+    
+    // Blink rate (10% weight) - normal is 12-20 blinks/min
+    const blinkScore = blinkRate >= 10 && blinkRate <= 25 ? 1.0 : 0.5;
+    score += blinkScore * 10;
+    
+    // Eyes open duration (15% weight) - sustained attention
+    const durationScore = Math.min(1.0, eyesOpenDuration / 30);
+    score += durationScore * 15;
+    
+    // Store in history for smoothing
+    attentionHistoryRef.current.push(score);
+    if (attentionHistoryRef.current.length > 10) attentionHistoryRef.current.shift();
+    
+    // Apply moving average for smooth scores
+    const smoothedScore = attentionHistoryRef.current.reduce((a, b) => a + b, 0) / attentionHistoryRef.current.length;
+    
+    return Math.round(Math.max(0, Math.min(100, smoothedScore)));
   };
 
 

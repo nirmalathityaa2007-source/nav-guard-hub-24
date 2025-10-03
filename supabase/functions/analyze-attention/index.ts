@@ -23,28 +23,82 @@ serve(async (req) => {
 
     console.log(`Analyzing attention for student: ${studentId}`);
 
-    // Frame analysis logic
-    // For now, we use the detection data from the frontend TensorFlow.js
-    // This can be replaced with heavy Python AI later by calling an external service
+    // Advanced multi-factor attention analysis
     let attentionScore = 0;
 
-    if (detectionData) {
-      const { faceDetected, eyesOpen, yaw, pitch, lookingAtScreen } = detectionData;
+    if (detectionData && detectionData.faceDetected) {
+      const {
+        eyeAspectRatio,
+        gazeDirection,
+        headPose,
+        blinkRate,
+        movementStability,
+        eyesOpenDuration,
+        lookingAtScreenConfidence
+      } = detectionData;
 
-      if (!faceDetected) {
-        attentionScore = 0; // No face detected
-      } else if (!eyesOpen) {
-        attentionScore = 0; // Eyes closed
-      } else if (lookingAtScreen && Math.abs(yaw) < 30 && Math.abs(pitch) < 20) {
-        attentionScore = Math.floor(95 + Math.random() * 6); // 95-100%
-      } else if (Math.abs(yaw) > 45 || Math.abs(pitch) > 30) {
-        attentionScore = 50; // Looking away / partial face
+      // Eyes closed = no attention
+      if (eyeAspectRatio.left < 0.2 && eyeAspectRatio.right < 0.2) {
+        attentionScore = 0;
       } else {
-        attentionScore = Math.floor(70 + Math.random() * 20); // 70-90%
+        // Multi-factor weighted scoring system
+        let score = 0;
+        
+        // Factor 1: Looking at screen confidence (35% weight)
+        score += lookingAtScreenConfidence * 35;
+        
+        // Factor 2: Head pose alignment (25% weight)
+        const yawPenalty = Math.abs(headPose.yaw) / 45; // 0-1 penalty
+        const pitchPenalty = Math.abs(headPose.pitch) / 30; // 0-1 penalty
+        const rollPenalty = Math.abs(headPose.roll) / 20; // 0-1 penalty
+        const headPoseScore = Math.max(0, 1 - yawPenalty - pitchPenalty - (rollPenalty * 0.5));
+        score += headPoseScore * 25;
+        
+        // Factor 3: Eye openness and quality (15% weight)
+        const avgEAR = (eyeAspectRatio.left + eyeAspectRatio.right) / 2;
+        const eyeScore = Math.min(1, avgEAR / 0.3); // Normalized to 0.3 as max
+        score += eyeScore * 15;
+        
+        // Factor 4: Movement stability (10% weight)
+        score += movementStability * 10;
+        
+        // Factor 5: Blink rate health (10% weight)
+        // Normal blink rate: 12-20 per minute
+        let blinkScore = 1.0;
+        if (blinkRate < 8) blinkScore = 0.6; // Too few blinks = distracted
+        else if (blinkRate > 30) blinkScore = 0.5; // Too many = fatigue
+        else if (blinkRate >= 12 && blinkRate <= 20) blinkScore = 1.0; // Optimal
+        else blinkScore = 0.8; // Acceptable
+        score += blinkScore * 10;
+        
+        // Factor 6: Sustained attention duration (5% weight)
+        const sustainedScore = Math.min(1, eyesOpenDuration / 60); // Max at 60 seconds
+        score += sustainedScore * 5;
+        
+        // Additional penalties
+        // Penalty for extreme gaze deviation
+        const gazeDeviation = Math.sqrt(
+          gazeDirection.horizontal ** 2 + gazeDirection.vertical ** 2
+        );
+        if (gazeDeviation > 3) {
+          score *= 0.85; // 15% penalty for looking away
+        }
+        
+        // Penalty for head tilted too much
+        if (Math.abs(headPose.roll) > 15) {
+          score *= 0.9; // 10% penalty for tilted head
+        }
+        
+        // Bonus for perfect attention
+        if (lookingAtScreenConfidence > 0.9 && headPoseScore > 0.9 && movementStability > 0.8) {
+          score = Math.min(100, score * 1.05); // 5% bonus
+        }
+        
+        attentionScore = Math.round(Math.max(0, Math.min(100, score)));
       }
     } else {
-      // Fallback: basic analysis of frame data
-      attentionScore = Math.floor(Math.random() * 100);
+      // No face detected
+      attentionScore = 0;
     }
 
     console.log(`Attention score calculated: ${attentionScore}`);
