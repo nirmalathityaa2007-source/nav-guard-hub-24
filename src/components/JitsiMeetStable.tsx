@@ -82,7 +82,7 @@ const JitsiMeetStable: React.FC<JitsiMeetStableProps> = ({
       const options = {
         roomName: roomName || 'live-class-room',
         width: '100%',
-        height: 500,
+        height: '100%',
         userInfo: {
           displayName: displayName || 'User'
         },
@@ -108,6 +108,7 @@ const JitsiMeetStable: React.FC<JitsiMeetStableProps> = ({
           disableInviteFunctions: userRole === 'student',
           doNotStoreRoom: true,
           enableNoisyMicDetection: true,
+          disableFilmstrip: false,
           p2p: {
             enabled: true,
             stunServers: [
@@ -121,7 +122,7 @@ const JitsiMeetStable: React.FC<JitsiMeetStableProps> = ({
           SHOW_JITSI_WATERMARK: false,
           SHOW_WATERMARK_FOR_GUESTS: false,
           DEFAULT_BACKGROUND: '#000000',
-          FILM_STRIP_MAX_HEIGHT: 120,
+          FILM_STRIP_MAX_HEIGHT: 90,
           ENABLE_FEEDBACK_ANIMATION: false,
           DISABLE_VIDEO_BACKGROUND: false,
           SHOW_CHROME_EXTENSION_BANNER: false,
@@ -136,7 +137,7 @@ const JitsiMeetStable: React.FC<JitsiMeetStableProps> = ({
             'invite', 'feedback', 'stats', 'shortcuts', 'tileview', 'mute-everyone'
           ] : [
             'microphone', 'camera', 'closedcaptions', 'fullscreen',
-            'hangup', 'chat', 'raisehand', 'settings', 'shortcuts'
+            'hangup', 'chat', 'raisehand', 'settings', 'shortcuts', 'filmstrip'
           ]
         }
       };
@@ -209,7 +210,7 @@ const JitsiMeetStable: React.FC<JitsiMeetStableProps> = ({
         <div 
           ref={containerRef} 
           className="w-full rounded-lg overflow-hidden border bg-background"
-          style={{ minHeight: '500px' }}
+          style={{ height: '70vh', minHeight: '600px' }}
         />
         <div className="mt-4 text-xs text-muted-foreground space-y-1">
           <p>• Room: {roomName}</p>
