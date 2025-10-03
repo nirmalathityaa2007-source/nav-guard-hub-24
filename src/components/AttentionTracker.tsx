@@ -184,9 +184,8 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
       });
 
       if (response.data?.attention_score !== undefined) {
-        const score = response.data.attention_score;
-        setAttentionScore(score);
-        onAttentionUpdate?.(score);
+        // Keep backend scoring for persistence only; UI uses local real-time score
+        // You can log or extend this if needed
       }
     } catch (error) {
       console.error('Error analyzing frame:', error);
@@ -374,8 +373,8 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
     const leftEAR = calculateEyeAspectRatio(leftEyePoints, keypoints);
     const rightEAR = calculateEyeAspectRatio(rightEyePoints, keypoints);
     
-    // Blink detection (EAR < 0.2 indicates closed eyes)
-    const eyesOpen = leftEAR > 0.2 && rightEAR > 0.2;
+    // Blink detection (EAR < 0.15 indicates closed eyes)
+    const eyesOpen = leftEAR > 0.15 && rightEAR > 0.15;
     if (!eyesOpen && now - lastBlinkTimeRef.current > 200) {
       blinkHistoryRef.current.push(now);
       lastBlinkTimeRef.current = now;
@@ -384,19 +383,9 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
     
     const eyesOpenDuration = eyesOpen ? (now - eyesOpenTimeRef.current) / 1000 : 0;
     
-    // Calculate gaze direction using iris and eye center
-    const leftEyeCenter = keypoints[468];
-    const rightEyeCenter = keypoints[473];
-    const leftIris = keypoints[468];
-    const rightIris = keypoints[473];
-    const leftGaze = calculateGazeDirection(leftEyeCenter, leftIris);
-    const rightGaze = calculateGazeDirection(rightEyeCenter, rightIris);
-    const avgGaze = {
-      horizontal: (leftGaze.horizontal + rightGaze.horizontal) / 2,
-      vertical: (leftGaze.vertical + rightGaze.vertical) / 2
-    };
-    
-    // Store gaze history
+    // Simplified gaze direction placeholder (driven by head pose + stability)
+    const avgGaze = { horizontal: 0, vertical: 0 };
+    // Store gaze history for stability reference
     gazeHistoryRef.current.push({ h: avgGaze.horizontal, v: avgGaze.vertical, timestamp: now });
     if (gazeHistoryRef.current.length > 30) gazeHistoryRef.current.shift();
     
@@ -411,15 +400,11 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
     // Calculate blink rate
     const blinkRate = calculateBlinkRate();
     
-    // Calculate looking at screen confidence
-    const headForward = Math.abs(headPose.yaw) < 15 && Math.abs(headPose.pitch) < 15;
-    const gazeForward = Math.abs(avgGaze.horizontal) < 2 && Math.abs(avgGaze.vertical) < 2;
-    const stableHead = movementStability > 0.7;
-    
-    let lookingAtScreenConfidence = 0;
-    if (headForward) lookingAtScreenConfidence += 0.4;
-    if (gazeForward) lookingAtScreenConfidence += 0.4;
-    if (stableHead) lookingAtScreenConfidence += 0.2;
+    // Looking at screen confidence driven by head pose + stability
+    const yawFactor = Math.max(0, 1 - Math.abs(headPose.yaw) / 30);
+    const pitchFactor = Math.max(0, 1 - Math.abs(headPose.pitch) / 20);
+    const stabilityFactor = Math.max(0, Math.min(1, movementStability));
+    const lookingAtScreenConfidence = 0.5 * yawFactor + 0.3 * pitchFactor + 0.2 * stabilityFactor;
     
     return {
       faceDetected: true,
@@ -439,7 +424,7 @@ const AttentionTracker: React.FC<AttentionTrackerProps> = ({
     const { eyeAspectRatio, headPose, blinkRate, movementStability, eyesOpenDuration, lookingAtScreenConfidence } = metrics;
     
     // Eyes closed = 0 attention
-    if (eyeAspectRatio.left < 0.2 && eyeAspectRatio.right < 0.2) return 0;
+    if (eyeAspectRatio.left < 0.15 && eyeAspectRatio.right < 0.15) return 0;
     
     // Multiple weighted factors for accurate scoring
     let score = 0;
