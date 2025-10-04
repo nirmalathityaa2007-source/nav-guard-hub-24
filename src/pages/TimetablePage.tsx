@@ -91,20 +91,39 @@ const TimetablePage = () => {
                   </div>
                   <div className="flex-1">
                     <h4 className="font-semibold">{classInfo.subject}</h4>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {time}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {classInfo.room}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <User className="h-3 w-3" />
-                        {classInfo.instructor}
-                        {classInfo.isSubstitute && <Badge variant="secondary" className="ml-1 text-xs">Substitute</Badge>}
-                      </span>
+                    <div className="flex flex-col gap-1 text-sm text-muted-foreground mt-1">
+                      <div className="flex items-center gap-4">
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {time}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {classInfo.room}
+                        </span>
+                      </div>
+                      {classInfo.needsSubstitute ? (
+                        <span className="flex items-center gap-1 text-red-600">
+                          <UserX className="h-3 w-3" />
+                          {classInfo.originalInstructor} for {classInfo.subject} is not available
+                        </span>
+                      ) : classInfo.isSubstitute ? (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="flex items-center gap-1 text-orange-600 line-through opacity-70">
+                            <UserX className="h-3 w-3" />
+                            {classInfo.originalInstructor} not available
+                          </span>
+                          <span className="flex items-center gap-1 text-green-600 font-medium">
+                            <User className="h-3 w-3" />
+                            {classInfo.instructor} (Substitute)
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          {classInfo.instructor}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <Button size="sm" variant="outline">
@@ -152,11 +171,20 @@ const TimetablePage = () => {
                           <>
                             <div className={`p-2 rounded text-xs ${getClassTypeColor(classInfo.type, classInfo.needsSubstitute, classInfo.isSubstitute)} h-full border`}>
                               <div className="font-medium truncate">{classInfo.subject}</div>
-                              <div className="opacity-90 truncate flex items-center gap-1">
-                                {classInfo.instructor}
-                                {classInfo.isSubstitute && <Badge variant="outline" className="text-xs px-1 py-0">Sub</Badge>}
-                                {classInfo.needsSubstitute && <Badge variant="destructive" className="text-xs px-1 py-0">Need Sub</Badge>}
-                              </div>
+                              {classInfo.needsSubstitute ? (
+                                <div className="opacity-90 text-xs">
+                                  <div className="font-medium text-red-700 truncate">{classInfo.originalInstructor}</div>
+                                  <div className="text-red-600">Not Available</div>
+                                </div>
+                              ) : classInfo.isSubstitute ? (
+                                <div className="opacity-90 text-xs space-y-0.5">
+                                  <div className="line-through opacity-60 truncate">{classInfo.originalInstructor}</div>
+                                  <div className="font-medium text-green-700 truncate">{classInfo.instructor}</div>
+                                  <Badge variant="outline" className="text-xs px-1 py-0">Substitute</Badge>
+                                </div>
+                              ) : (
+                                <div className="opacity-90 truncate">{classInfo.instructor}</div>
+                              )}
                               <div className="opacity-75 truncate">{classInfo.room}</div>
                             </div>
                             {user?.role === 'faculty' && isUserClass && !classInfo.needsSubstitute && (
