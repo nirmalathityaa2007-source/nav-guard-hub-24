@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AttentionDashboard from '@/components/AttentionDashboard';
+import ClassAnalyticsDashboard from '@/components/ClassAnalyticsDashboard';
 import {
   Users,
   BookOpen,
@@ -28,8 +29,9 @@ const AdminDashboard = () => {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="classes">Classes</TabsTrigger>
           <TabsTrigger value="attention">Attention Analytics</TabsTrigger>
           <TabsTrigger value="system">System Status</TabsTrigger>
           <TabsTrigger value="management">Management</TabsTrigger>
@@ -177,6 +179,10 @@ const AdminDashboard = () => {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="classes" className="space-y-6">
+          <ClassAnalyticsDashboard />
         </TabsContent>
 
         <TabsContent value="attention" className="space-y-6">
