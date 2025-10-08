@@ -35,6 +35,54 @@ export type Database = {
         }
         Relationships: []
       }
+      classes: {
+        Row: {
+          class_type: Database["public"]["Enums"]["class_type"]
+          created_at: string | null
+          day_of_week: Database["public"]["Enums"]["day_of_week"]
+          id: string
+          instructor_name: string
+          is_active: boolean | null
+          needs_substitute: boolean | null
+          original_instructor: string | null
+          room: string
+          subject: string
+          substitute_instructor: string | null
+          time_slot: string
+          updated_at: string | null
+        }
+        Insert: {
+          class_type?: Database["public"]["Enums"]["class_type"]
+          created_at?: string | null
+          day_of_week: Database["public"]["Enums"]["day_of_week"]
+          id?: string
+          instructor_name: string
+          is_active?: boolean | null
+          needs_substitute?: boolean | null
+          original_instructor?: string | null
+          room: string
+          subject: string
+          substitute_instructor?: string | null
+          time_slot: string
+          updated_at?: string | null
+        }
+        Update: {
+          class_type?: Database["public"]["Enums"]["class_type"]
+          created_at?: string | null
+          day_of_week?: Database["public"]["Enums"]["day_of_week"]
+          id?: string
+          instructor_name?: string
+          is_active?: boolean | null
+          needs_substitute?: boolean | null
+          original_instructor?: string | null
+          room?: string
+          subject?: string
+          substitute_instructor?: string | null
+          time_slot?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -43,7 +91,15 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      class_type: "lecture" | "lab" | "study" | "project"
+      day_of_week:
+        | "Monday"
+        | "Tuesday"
+        | "Wednesday"
+        | "Thursday"
+        | "Friday"
+        | "Saturday"
+        | "Sunday"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -170,6 +226,17 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      class_type: ["lecture", "lab", "study", "project"],
+      day_of_week: [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+      ],
+    },
   },
 } as const
