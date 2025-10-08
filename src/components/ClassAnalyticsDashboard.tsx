@@ -74,6 +74,7 @@ const ClassAnalyticsDashboard = () => {
       const { data, error } = await supabase
         .from('classes')
         .select('*')
+        .eq('is_active', true)
         .order('day_of_week', { ascending: true })
         .order('time_slot', { ascending: true });
 
@@ -91,9 +92,9 @@ const ClassAnalyticsDashboard = () => {
   };
 
   const calculateStats = (data: ClassData[]) => {
-    // Basic stats
+    // Basic stats - all data is already filtered to active classes
     const totalClasses = data.length;
-    const activeClasses = data.filter(c => c.is_active).length;
+    const activeClasses = data.length; // All fetched classes are active
     const needingSubstitute = data.filter(c => c.needs_substitute).length;
     const uniqueInstructors = new Set(data.map(c => c.instructor_name)).size;
     const uniqueRooms = new Set(data.map(c => c.room)).size;
@@ -160,23 +161,23 @@ const ClassAnalyticsDashboard = () => {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Classes</CardTitle>
+            <CardTitle className="text-sm font-medium">Available Classes</CardTitle>
             <BookOpen className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalClasses}</div>
-            <p className="text-xs text-muted-foreground">Across all periods</p>
+            <p className="text-xs text-muted-foreground">Active classes</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Classes</CardTitle>
+            <CardTitle className="text-sm font-medium">Without Issues</CardTitle>
             <TrendingUp className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.activeClasses}</div>
-            <p className="text-xs text-muted-foreground">Currently running</p>
+            <div className="text-2xl font-bold">{stats.activeClasses - stats.needingSubstitute}</div>
+            <p className="text-xs text-muted-foreground">Running smoothly</p>
           </CardContent>
         </Card>
 
@@ -333,8 +334,8 @@ const ClassAnalyticsDashboard = () => {
       {/* Detailed Class List */}
       <Card>
         <CardHeader>
-          <CardTitle>All Classes</CardTitle>
-          <CardDescription>Complete schedule overview</CardDescription>
+          <CardTitle>Available Classes</CardTitle>
+          <CardDescription>Active classes schedule</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -380,10 +381,8 @@ const ClassAnalyticsDashboard = () => {
                   <TableCell>
                     {cls.needs_substitute ? (
                       <Badge variant="destructive">Needs Substitute</Badge>
-                    ) : cls.is_active ? (
-                      <Badge variant="secondary">Active</Badge>
                     ) : (
-                      <Badge variant="outline">Inactive</Badge>
+                      <Badge variant="secondary">Available</Badge>
                     )}
                   </TableCell>
                 </TableRow>
